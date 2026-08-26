@@ -2,6 +2,7 @@ const PIN_CORRECTO = "0308";
 let transactions = JSON.parse(localStorage.getItem("app_transactions")) || [];
 let activePerfil = "Fernando";
 let currentFilter = "Todos";
+let periodFilter = "actual"; // 'actual' o 'todos'
 let editingTxId = null;
 let donutChartInstance = null;
 let monthlyChartInstance = null;
@@ -49,7 +50,6 @@ function initPIN() {
   });
 }
 
-/* --- Botón para abrir Google Sheet --- */
 function initSheetRedirect() {
   const btnOpenSheet = document.getElementById("btnOpenSheet");
   btnOpenSheet.addEventListener("click", () => {
@@ -73,13 +73,18 @@ function initTableFilters() {
       renderAll();
     });
   });
+
+  const periodSelect = document.getElementById("periodoFilterSelect");
+  periodSelect.addEventListener("change", (e) => {
+    periodFilter = e.target.value;
+    renderAll();
+  });
 }
 
-/* --- Formulario e Inputs --- */
 function initForm() {
   const valorInput = document.getElementById("valor");
   const fechaInput = document.getElementById("fecha");
-
+  
   fechaInput.value = new Date().toISOString().split('T')[0];
 
   valorInput.addEventListener("input", (e) => {
@@ -95,13 +100,13 @@ function initForm() {
   document.getElementById("txForm").addEventListener("submit", handleFormSubmit);
 }
 
-/* --- Guardar o Actualizar Registro --- */
+/* --- Guardar / Editar --- */
 async function handleFormSubmit(e) {
   e.preventDefault();
-
+  
   const btnGuardar = document.getElementById("btnGuardar");
   const valorRaw = document.getElementById("valor").value.replace(/\D/g, "");
-
+  
   if (!valorRaw || parseInt(valorRaw) <= 0) {
     mostrarToast("Ingresa un monto válido");
     return;
@@ -139,7 +144,6 @@ async function handleFormSubmit(e) {
   btnGuardar.disabled = false;
 }
 
-/* --- Iniciar Edición --- */
 function editTransaction(id) {
   const tx = transactions.find(t => t.id === id);
   if (!tx) return;
@@ -153,7 +157,7 @@ function editTransaction(id) {
 
   const btnGuardar = document.getElementById("btnGuardar");
   btnGuardar.querySelector("span").innerText = "Actualizar Cambios";
-
+  
   if (!document.getElementById("btnCancelEdit")) {
     const btnCancel = document.createElement("button");
     btnCancel.type = "button";
@@ -167,7 +171,6 @@ function editTransaction(id) {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-/* --- Eliminar Registro --- */
 async function deleteTransaction(id) {
   if (!confirm("¿Estás seguro de que deseas eliminar este registro?")) return;
 
@@ -193,7 +196,6 @@ function resetFormState() {
   if (btnCancel) btnCancel.remove();
 }
 
-/* --- Sincronización remota --- */
 async function syncTransactionWithAction(tx) {
   const apiUrl = localStorage.getItem("app_api_url");
   if (!apiUrl || !navigator.onLine) {
@@ -219,25 +221,108 @@ async function syncTransactionWithAction(tx) {
   }
 }
 
-/* --- Renderizado --- */
+/* --- Lógica de Filtro por Período Mensual --- */
+function getCycleDates() {
+  const startDay = parseInt(localStorage.getItem("app_dia_ciclo") || 1, 10);
+  const now = new Date();
+  let year = now.getFullYear();
+  let month = now.getMonth();
+
+  let startDate, endDate;
+
+  if (now.getDate() >= startDay) {
+    startDate = new Date(year, month, startDay);
+    endDate = new Date(year, month + 1, startDay - 1, 23, 59, 59);
+  } else {
+    startDate = new Date(year, month - 1, startDay);
+    endDate = new Date(year, month, startDay - 1, 23, 59, 59);
+  }
+
+  return { startDate, endDate };
+}
+
 function renderAll() {
   const profileTx = transactions.filter(t => t.perfil === activePerfil);
-  renderTable(profileTx);
-  renderBalanceAndDonut(profileTx);
+  const { startDate, endDate } = getCycleDates();
+
+  // Filtrar movimientos del ciclo actual vs anteriores
+  const currentCycleTx = profileTx.filter(t => {
+    const d = new Date(t.fecha + "T00:00:00");
+    return d >= startDate && d <= endDate;
+  });
+
+  const previousTx = profileTx.filter(t => {
+    const d = new Date(t.fecha + "T00:00:00");
+    return d < startDate;
+  });
+
+  // Saldo remanente de meses pasados
+  let remanenteAnterior = 0;
+  previousTx.forEach(t => {
+    if (t.tipo === "Ingreso") remanenteAnterior += t.valor;
+    if (t.tipo === "Gasto") remanenteAnterior -= t.valor;
+  });
+
+  renderBalanceAndDonut(currentCycleTx, remanenteAnterior, startDate, endDate);
+  renderTable(profileTx, currentCycleTx);
   renderMonthlyTrend(profileTx);
   updateSyncBadge();
 }
 
-function renderTable(profileTx) {
+function renderBalanceAndDonut(currentCycleTx, remanenteAnterior, startDate, endDate) {
+  let ingresosCiclo = 0;
+  let gastosCiclo = 0;
+
+  currentCycleTx.forEach(tx => {
+    if (tx.tipo === "Ingreso") ingresosCiclo += tx.valor;
+    if (tx.tipo === "Gasto") gastosCiclo += tx.valor;
+  });
+
+  // Balance total acumulado considerando lo que venía del mes pasado
+  const totalBalance = remanenteAnterior + ingresosCiclo - gastosCiclo;
+
+  const optionsDate = { month: 'short', day: 'numeric' };
+  document.getElementById("periodoTitle").innerText = `CICLO: ${startDate.toLocaleDateString('es-CO', optionsDate)} - ${endDate.toLocaleDateString('es-CO', optionsDate)}`;
+  document.getElementById("remanenteAnteriorText").innerText = `Saldo disponible acumulado anterior: $ ${remanenteAnterior.toLocaleString('es-CO')}`;
+  document.getElementById("totalBalance").innerText = `$ ${totalBalance.toLocaleString('es-CO')}`;
+  document.getElementById("totalIngresos").innerText = `$ ${ingresosCiclo.toLocaleString('es-CO')}`;
+  document.getElementById("totalGastos").innerText = `$ ${gastosCiclo.toLocaleString('es-CO')}`;
+
+  const ctx = document.getElementById("balanceChart").getContext("2d");
+  if (donutChartInstance) donutChartInstance.destroy();
+
+  const totalDisponible = Math.max(0, (remanenteAnterior + ingresosCiclo) - gastosCiclo);
+
+  donutChartInstance = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: ['Gastos del Ciclo', 'Disponible'],
+      datasets: [{
+        data: (ingresosCiclo + remanenteAnterior) === 0 ? [0, 1] : [gastosCiclo, totalDisponible],
+        backgroundColor: ['#dc2626', '#059669'],
+        borderWidth: 0
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      cutout: '75%'
+    }
+  });
+}
+
+function renderTable(allProfileTx, currentCycleTx) {
   const tbody = document.getElementById("tablaCuerpo");
   tbody.innerHTML = "";
 
-  let filteredTx = profileTx;
+  let baseTx = (periodFilter === "actual") ? currentCycleTx : allProfileTx;
+
   if (currentFilter !== "Todos") {
-    filteredTx = profileTx.filter(t => t.tipo === currentFilter);
+    baseTx = baseTx.filter(t => t.tipo === currentFilter);
   }
 
-  filteredTx.slice(0, 15).forEach(tx => {
+  baseTx.slice(0, 20).forEach(tx => {
     const tr = document.createElement("tr");
     const claseMonto = tx.tipo === "Ingreso" ? "text-ingreso" : "text-gasto";
     const signo = tx.tipo === "Gasto" ? "-" : "+";
@@ -257,45 +342,6 @@ function renderTable(profileTx) {
   });
 }
 
-function renderBalanceAndDonut(profileTx) {
-  let totalIngresos = 0;
-  let totalGastos = 0;
-
-  profileTx.forEach(tx => {
-    if (tx.tipo === "Ingreso") totalIngresos += tx.valor;
-    if (tx.tipo === "Gasto") totalGastos += tx.valor;
-  });
-
-  const balance = totalIngresos - totalGastos;
-
-  document.getElementById("totalBalance").innerText = `$ ${balance.toLocaleString('es-CO')}`;
-  document.getElementById("totalIngresos").innerText = `$ ${totalIngresos.toLocaleString('es-CO')}`;
-  document.getElementById("totalGastos").innerText = `$ ${totalGastos.toLocaleString('es-CO')}`;
-
-  const ctx = document.getElementById("balanceChart").getContext("2d");
-  if (donutChartInstance) donutChartInstance.destroy();
-
-  const restante = Math.max(0, totalIngresos - totalGastos);
-
-  donutChartInstance = new Chart(ctx, {
-    type: 'doughnut',
-    data: {
-      labels: ['Gastos', 'Disponible'],
-      datasets: [{
-        data: totalIngresos === 0 ? [0, 1] : [totalGastos, restante],
-        backgroundColor: ['#dc2626', '#059669'],
-        borderWidth: 0
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: { legend: { display: false } },
-      cutout: '75%'
-    }
-  });
-}
-
 function renderMonthlyTrend(profileTx) {
   const monthlyData = {};
 
@@ -309,7 +355,6 @@ function renderMonthlyTrend(profileTx) {
   });
 
   const sortedMonths = Object.keys(monthlyData).sort();
-  const labels = sortedMonths;
   const dataIngresos = sortedMonths.map(m => monthlyData[m].ingresos);
   const dataGastos = sortedMonths.map(m => monthlyData[m].gastos);
 
@@ -319,7 +364,7 @@ function renderMonthlyTrend(profileTx) {
   monthlyChartInstance = new Chart(ctx, {
     type: 'line',
     data: {
-      labels: labels,
+      labels: sortedMonths,
       datasets: [
         {
           label: 'Ingresos',
