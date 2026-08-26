@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Control Financiero Corporativo</title>
+
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#ffffff">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <link rel="apple-touch-icon" href="icon.png">
+
+  <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+
+<body>
+
+  <!-- Pantalla de Acceso: Selección de Perfil y PIN -->
+  <div id="pinScreen" class="pin-overlay">
+    <div class="pin-card card-shadow">
+      <div class="brand-logo">
+        <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" stroke-width="2">
+          <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+        </svg>
+      </div>
+      <h2>Sistema Financiero</h2>
+      <p>Selecciona tu perfil e ingresa el PIN de acceso</p>
+
+      <div class="form-group text-left mb-3">
+        <label for="pinPerfilSelect">Perfil de Usuario</label>
+        <select id="pinPerfilSelect" class="form-control">
+          <option value="Fernando">Fernando</option>
+          <option value="Eli">Eli</option>
+          <option value="Compartido">Compartido</option>
+        </select>
+      </div>
+
+      <div class="form-group text-left mb-3">
+        <label for="pinInput">Código de Acceso (PIN)</label>
+        <input type="password" id="pinInput" maxlength="4" pattern="\d*" inputmode="numeric" placeholder="••••"
+          class="form-control text-center font-lg">
+      </div>
+
+      <button id="btnUnlock" class="btn btn-primary full-width">Ingresar al Sistema</button>
+      <p id="pinError" class="error-msg hidden">PIN incorrecto. Intenta nuevamente.</p>
+    </div>
+  </div>
+
+  <!-- Contenido Principal -->
+  <div id="appContent" class="app-wrapper hidden">
+
+    <header class="app-header card-shadow">
+      <div class="header-container">
+        <div class="brand">
+          <div class="brand-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" stroke-width="2">
+              <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+            </svg>
+          </div>
+          <span class="brand-title">Enterprise Finance</span>
+        </div>
+        <div class="header-actions">
+          <span id="currentPerfilBadge" class="badge-perfil">Perfil: Fernando</span>
+          <button id="btnOpenSheet" class="btn btn-secondary btn-sm" title="Abrir Google Sheet">📊 Sheet</button>
+          <button id="btnSettings" class="btn-icon-only" title="Configuración">⚙️</button>
+          <button id="btnLogout" class="btn-icon-only" title="Cerrar Sesión">🔒</button>
+        </div>
+      </div>
+    </header>
+
+    <main class="main-container">
+
+      <!-- Modal Ajustes -->
+      <div id="settingsModal" class="modal hidden">
+        <div class="modal-content card card-shadow">
+          <div class="card-header border-bottom">
+            <h2>Configuración del Sistema</h2>
+            <button id="btnCloseSettings" class="btn-close">&times;</button>
+          </div>
+          <div class="form-group">
+            <label for="apiUrl">URL Google Apps Script (/exec)</label>
+            <input type="url" id="apiUrl" placeholder="https://script.google.com/macros/s/.../exec"
+              class="form-control">
+          </div>
+          <div class="form-group">
+            <label for="sheetUrl">URL de tu Hoja de Cálculo (Google Sheets)</label>
+            <input type="url" id="sheetUrl" placeholder="https://docs.google.com/spreadsheets/d/..."
+              class="form-control">
+          </div>
+          <div class="form-group">
+            <label for="diaInicioCiclo">Día de inicio del ciclo mensual</label>
+            <input type="number" id="diaInicioCiclo" min="1" max="31" value="1" class="form-control">
+          </div>
+          <button id="btnSaveSettings" class="btn btn-primary full-width">Guardar Cambios</button>
+        </div>
+      </div>
+
+      <!-- Tarjeta de Balance y Gráfico de Dona -->
+      <section class="card card-shadow balance-card">
+        <div class="balance-grid">
+          <div class="balance-info">
+            <span class="sub-title">Balance General del Ciclo</span>
+            <h2 id="totalBalance">$ 0</h2>
+            <div class="balance-stats">
+              <div class="stat-item">
+                <small>Total Ingresos</small>
+                <span id="totalIngresos" class="text-ingreso">$ 0</span>
+              </div>
+              <div class="stat-item">
+                <small>Total Gastos</small>
+                <span id="totalGastos" class="text-gasto">$ 0</span>
+              </div>
+            </div>
+          </div>
+          <div class="chart-container">
+            <canvas id="balanceChart"></canvas>
+          </div>
+        </div>
+      </section>
+
+      <!-- Formulario de Registro -->
+      <section class="card card-shadow form-card">
+        <div class="card-header border-bottom">
+          <h2>Registrar Movimiento</h2>
+        </div>
+
+        <form id="txForm" class="finance-form">
+          <input type="hidden" id="txIdHidden" value="">
+          <div class="form-grid">
+
+            <div class="form-group">
+              <label for="fecha">Fecha</label>
+              <input type="date" id="fecha" required class="form-control">
+            </div>
+
+            <div class="form-group">
+              <label for="tipo">Tipo</label>
+              <select id="tipo" required class="form-control">
+                <option value="Gasto" selected>Gasto</option>
+                <option value="Ingreso">Ingreso</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="subtipo">Categoría</label>
+              <select id="subtipo" required class="form-control">
+                <option value="Salario">Salario</option>
+                <option value="Alimentacion">Alimentacion</option>
+                <option value="Servicios">Servicios</option>
+                <option value="Transporte">Transporte</option>
+                <option value="Colegio">Colegio</option>
+                <option value="Trabajo">Trabajo</option>
+                <option value="Restaurante">Restaurante</option>
+                <option value="Prestamos">Prestamos</option>
+                <option value="Hogar">Hogar</option>
+                <option value="Belleza y salud">Belleza y salud</option>
+                <option value="Ahorro">Ahorro</option>
+                <option value="Otros">Otros</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="valor">Monto ($)</label>
+              <input type="text" id="valor" inputmode="numeric" placeholder="$ 0" required class="form-control">
+            </div>
+
+            <div class="form-group full-width">
+              <label for="motivo">Descripción / Observación</label>
+              <input type="text" id="motivo" placeholder="Detalle opcional..." class="form-control">
+            </div>
+
+          </div>
+
+          <div class="form-actions">
+            <button type="submit" id="btnGuardar" class="btn btn-primary full-width">
+              <span>Guardar Registro</span>
+            </button>
+          </div>
+        </form>
+      </section>
+
+      <!-- Gráfico de Evolución Mensual -->
+      <section class="card card-shadow chart-card">
+        <div class="card-header border-bottom">
+          <h2>Comportamiento Mensual (Ingresos vs Gastos)</h2>
+        </div>
+        <div class="line-chart-container">
+          <canvas id="monthlyTrendChart"></canvas>
+        </div>
+      </section>
+
+      <!-- Tabla Histórica con Filtros de Visualización -->
+      <section class="card card-shadow list-card">
+        <div class="card-header border-bottom flex-between">
+          <h2>Historial de Movimientos</h2>
+          <span id="syncStatus" class="badge badge-success">Sincronizado</span>
+        </div>
+
+        <!-- Filtros Rápidos de Visualización -->
+        <div class="filter-bar border-bottom">
+          <span class="filter-label">Ver listado de:</span>
+          <div class="btn-group">
+            <button class="btn-filter active" data-filter="Todos">Todos</button>
+            <button class="btn-filter filter-ingreso" data-filter="Ingreso">Solo Ingresos</button>
+            <button class="btn-filter filter-gasto" data-filter="Gasto">Solo Gastos</button>
+          </div>
+        </div>
+
+        <div class="table-responsive">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Tipo</th>
+                <th>Categoría</th>
+                <th>Descripción</th>
+                <th class="text-right">Monto</th>
+                <th class="text-center">Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="tablaCuerpo">
+              <!-- Filas dinámicas -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="app.js"></script>
+</body>
+
+</html>

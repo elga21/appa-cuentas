@@ -1,0 +1,17 @@
+{
+  "name": "Appa Cuentas",
+  "short_name": "AppaCuentas",
+  "start_url": "index.html",
+  "display": "standalone",
+  "background_color": "#0d0e15",
+  "theme_color": "#0d0e15",
+  "description": "Aplicación de contabilidad móvil personal con sincronización en Google Sheets.",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "icon.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
