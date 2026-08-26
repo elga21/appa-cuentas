@@ -1,17 +1,16 @@
 {
-  "name": "Appa Cuentas",
-  "short_name": "AppaCuentas",
-  "start_url": "index.html",
-  "display": "standalone",
-  "background_color": "#0d0e15",
-  "theme_color": "#0d0e15",
-  "description": "Aplicación de contabilidad móvil personal con sincronización en Google Sheets.",
-  "orientation": "portrait",
+  "short_name": "Finanzas",
+  "name": "Control Financiero",
   "icons": [
     {
       "src": "icon.png",
-      "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "sizes": "512x512"
     }
-  ]
+  ],
+  "start_url": "./index.html",
+  "background_color": "#f4f6f9",
+  "theme_color": "#0f172a",
+  "display": "standalone",
+  "orientation": "portrait"
 }
