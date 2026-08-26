@@ -1,11 +1,10 @@
 <!DOCTYPE html>
 <html lang="es">
-
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Control Financiero Corporativo</title>
-
+  
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#ffffff">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -18,17 +17,13 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
-
 <body>
 
-  <!-- Pantalla de Acceso: Selección de Perfil y PIN -->
+  <!-- Pantalla de Acceso -->
   <div id="pinScreen" class="pin-overlay">
     <div class="pin-card card-shadow">
       <div class="brand-logo">
-        <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none"
-          stroke="currentColor" stroke-width="2">
-          <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-        </svg>
+        <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
       </div>
       <h2>Sistema Financiero</h2>
       <p>Selecciona tu perfil e ingresa el PIN de acceso</p>
@@ -44,8 +39,7 @@
 
       <div class="form-group text-left mb-3">
         <label for="pinInput">Código de Acceso (PIN)</label>
-        <input type="password" id="pinInput" maxlength="4" pattern="\d*" inputmode="numeric" placeholder="••••"
-          class="form-control text-center font-lg">
+        <input type="password" id="pinInput" maxlength="4" pattern="\d*" inputmode="numeric" placeholder="••••" class="form-control text-center font-lg">
       </div>
 
       <button id="btnUnlock" class="btn btn-primary full-width">Ingresar al Sistema</button>
@@ -55,15 +49,12 @@
 
   <!-- Contenido Principal -->
   <div id="appContent" class="app-wrapper hidden">
-
+    
     <header class="app-header card-shadow">
       <div class="header-container">
         <div class="brand">
           <div class="brand-icon">
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
-              stroke="currentColor" stroke-width="2">
-              <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-            </svg>
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
           </div>
           <span class="brand-title">Enterprise Finance</span>
         </div>
@@ -77,7 +68,7 @@
     </header>
 
     <main class="main-container">
-
+      
       <!-- Modal Ajustes -->
       <div id="settingsModal" class="modal hidden">
         <div class="modal-content card card-shadow">
@@ -87,35 +78,34 @@
           </div>
           <div class="form-group">
             <label for="apiUrl">URL Google Apps Script (/exec)</label>
-            <input type="url" id="apiUrl" placeholder="https://script.google.com/macros/s/.../exec"
-              class="form-control">
+            <input type="url" id="apiUrl" placeholder="https://script.google.com/macros/s/.../exec" class="form-control">
           </div>
           <div class="form-group">
             <label for="sheetUrl">URL de tu Hoja de Cálculo (Google Sheets)</label>
-            <input type="url" id="sheetUrl" placeholder="https://docs.google.com/spreadsheets/d/..."
-              class="form-control">
+            <input type="url" id="sheetUrl" placeholder="https://docs.google.com/spreadsheets/d/..." class="form-control">
           </div>
           <div class="form-group">
-            <label for="diaInicioCiclo">Día de inicio del ciclo mensual</label>
+            <label for="diaInicioCiclo">Día de inicio del ciclo mensual (Ej: 1 o 15)</label>
             <input type="number" id="diaInicioCiclo" min="1" max="31" value="1" class="form-control">
           </div>
           <button id="btnSaveSettings" class="btn btn-primary full-width">Guardar Cambios</button>
         </div>
       </div>
 
-      <!-- Tarjeta de Balance y Gráfico de Dona -->
+      <!-- Tarjeta de Balance del Período Actual -->
       <section class="card card-shadow balance-card">
         <div class="balance-grid">
           <div class="balance-info">
-            <span class="sub-title">Balance General del Ciclo</span>
+            <span class="sub-title" id="periodoTitle">BALANCE PERÍODO ACTUAL</span>
             <h2 id="totalBalance">$ 0</h2>
+            <small id="remanenteAnteriorText" class="text-muted-sm">Saldo mes anterior: $ 0</small>
             <div class="balance-stats">
               <div class="stat-item">
-                <small>Total Ingresos</small>
+                <small>Ingresos Ciclo</small>
                 <span id="totalIngresos" class="text-ingreso">$ 0</span>
               </div>
               <div class="stat-item">
-                <small>Total Gastos</small>
+                <small>Gastos Ciclo</small>
                 <span id="totalGastos" class="text-gasto">$ 0</span>
               </div>
             </div>
@@ -131,11 +121,11 @@
         <div class="card-header border-bottom">
           <h2>Registrar Movimiento</h2>
         </div>
-
+        
         <form id="txForm" class="finance-form">
           <input type="hidden" id="txIdHidden" value="">
           <div class="form-grid">
-
+            
             <div class="form-group">
               <label for="fecha">Fecha</label>
               <input type="date" id="fecha" required class="form-control">
@@ -190,27 +180,36 @@
       <!-- Gráfico de Evolución Mensual -->
       <section class="card card-shadow chart-card">
         <div class="card-header border-bottom">
-          <h2>Comportamiento Mensual (Ingresos vs Gastos)</h2>
+          <h2>Comportamiento Histórico de Meses</h2>
         </div>
         <div class="line-chart-container">
           <canvas id="monthlyTrendChart"></canvas>
         </div>
       </section>
 
-      <!-- Tabla Histórica con Filtros de Visualización -->
+      <!-- Tabla Histórica con Filtro de Período y Vista -->
       <section class="card card-shadow list-card">
         <div class="card-header border-bottom flex-between">
-          <h2>Historial de Movimientos</h2>
+          <h2>Movimientos del Sistema</h2>
           <span id="syncStatus" class="badge badge-success">Sincronizado</span>
         </div>
 
-        <!-- Filtros Rápidos de Visualización -->
+        <!-- Filtros Rápidos -->
         <div class="filter-bar border-bottom">
-          <span class="filter-label">Ver listado de:</span>
-          <div class="btn-group">
-            <button class="btn-filter active" data-filter="Todos">Todos</button>
-            <button class="btn-filter filter-ingreso" data-filter="Ingreso">Solo Ingresos</button>
-            <button class="btn-filter filter-gasto" data-filter="Gasto">Solo Gastos</button>
+          <div class="filter-group">
+            <span class="filter-label">Período:</span>
+            <select id="periodoFilterSelect" class="form-control form-control-sm">
+              <option value="actual" selected>Ciclo Actual</option>
+              <option value="todos">Todo el Histórico</option>
+            </select>
+          </div>
+          <div class="filter-group">
+            <span class="filter-label">Tipo:</span>
+            <div class="btn-group">
+              <button class="btn-filter active" data-filter="Todos">Todos</button>
+              <button class="btn-filter filter-ingreso" data-filter="Ingreso">Ingresos</button>
+              <button class="btn-filter filter-gasto" data-filter="Gasto">Gastos</button>
+            </div>
           </div>
         </div>
 
@@ -240,5 +239,4 @@
 
   <script src="app.js"></script>
 </body>
-
 </html>
