@@ -4,7 +4,7 @@ Aplicación de contabilidad personal de tipo **PWA (Progressive Web App)**, dise
 
 ---
 
-## 🚀 Arquitectura Serverless (Sin Costos de Servidor)
+##  Arquitectura Serverless (Sin Costos de Servidor)
 
 **No necesitas contratar ni pagar ningún servidor.** La aplicación funciona de manera 100% serverless y gratuita:
 1. **Interfaz (Frontend)**: Alojada gratis en **GitHub Pages**. Consiste en archivos estáticos (HTML, CSS, JS) que se ejecutan directamente en tu celular.
@@ -12,7 +12,7 @@ Aplicación de contabilidad personal de tipo **PWA (Progressive Web App)**, dise
 
 ---
 
-## 📦 Características Principales
+##  Características Principales
 
 * **Pantalla de Bloqueo por PIN**: Acceso protegido con el PIN fijo `0308` para asegurar tus datos financieros.
 * **Múltiples Perfiles**: Crea y administra perfiles de usuario independientes.
