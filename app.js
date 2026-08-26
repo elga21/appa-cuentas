@@ -1,6 +1,7 @@
 const PIN_CORRECTO = "0308";
 let transactions = JSON.parse(localStorage.getItem("app_transactions")) || [];
-let activePerfil = "Fernando";
+let profilesList = JSON.parse(localStorage.getItem("app_profiles")) || [];
+let activePerfil = "";
 let currentFilter = "Todos";
 let periodFilter = "actual"; // 'actual' o 'todos'
 let editingTxId = null;
@@ -16,24 +17,84 @@ document.addEventListener("DOMContentLoaded", () => {
   initOfflineSync();
 });
 
-/* --- Autenticación --- */
+/* --- Gestión Dinámica de Perfiles y Autenticación --- */
 function initPIN() {
   const btnUnlock = document.getElementById("btnUnlock");
   const pinInput = document.getElementById("pinInput");
   const pinError = document.getElementById("pinError");
   const perfilSelect = document.getElementById("pinPerfilSelect");
+  const nuevoPerfilGroup = document.getElementById("nuevoPerfilGroup");
+  const nuevoPerfilInput = document.getElementById("nuevoPerfilInput");
   const btnLogout = document.getElementById("btnLogout");
 
+  const updateProfilesDropdown = () => {
+    perfilSelect.innerHTML = "";
+    
+    if (profilesList.length > 0) {
+      profilesList.forEach(p => {
+        const option = document.createElement("option");
+        option.value = p;
+        option.innerText = p;
+        perfilSelect.appendChild(option);
+      });
+    }
+
+    const newOption = document.createElement("option");
+    newOption.value = "__NEW__";
+    newOption.innerText = "+ Registrar Nuevo Perfil";
+    perfilSelect.appendChild(newOption);
+
+    if (profilesList.length === 0 || perfilSelect.value === "__NEW__") {
+      nuevoPerfilGroup.classList.remove("hidden");
+    } else {
+      nuevoPerfilGroup.classList.add("hidden");
+    }
+  };
+
+  perfilSelect.addEventListener("change", (e) => {
+    if (e.target.value === "__NEW__") {
+      nuevoPerfilGroup.classList.remove("hidden");
+      nuevoPerfilInput.focus();
+    } else {
+      nuevoPerfilGroup.classList.add("hidden");
+    }
+  });
+
+  updateProfilesDropdown();
+
   const verifyPIN = () => {
+    let perfilSeleccionado = perfilSelect.value;
+
+    if (perfilSeleccionado === "__NEW__" || profilesList.length === 0) {
+      perfilSeleccionado = nuevoPerfilInput.value.trim();
+    }
+
+    if (!perfilSeleccionado) {
+      pinError.innerText = "Por favor, ingresa o selecciona un perfil.";
+      pinError.classList.remove("hidden");
+      return;
+    }
+
     if (pinInput.value === PIN_CORRECTO) {
-      activePerfil = perfilSelect.value;
+      activePerfil = perfilSeleccionado;
+
+      if (!profilesList.includes(activePerfil)) {
+        profilesList.push(activePerfil);
+        localStorage.setItem("app_profiles", JSON.stringify(profilesList));
+      }
+
       document.getElementById("currentPerfilBadge").innerText = `Perfil: ${activePerfil}`;
       document.getElementById("pinScreen").classList.add("hidden");
       document.getElementById("appContent").classList.remove("hidden");
+      
       pinInput.value = "";
+      nuevoPerfilInput.value = "";
       pinError.classList.add("hidden");
+      
+      updateProfilesDropdown();
       renderAll();
     } else {
+      pinError.innerText = "PIN incorrecto. Intenta nuevamente.";
       pinError.classList.remove("hidden");
       pinInput.value = "";
     }
@@ -43,10 +104,14 @@ function initPIN() {
   pinInput.addEventListener("keyup", (e) => {
     if (e.key === "Enter") verifyPIN();
   });
+  nuevoPerfilInput.addEventListener("keyup", (e) => {
+    if (e.key === "Enter") verifyPIN();
+  });
 
   btnLogout.addEventListener("click", () => {
     document.getElementById("appContent").classList.add("hidden");
     document.getElementById("pinScreen").classList.remove("hidden");
+    updateProfilesDropdown();
   });
 }
 
@@ -245,7 +310,6 @@ function renderAll() {
   const profileTx = transactions.filter(t => t.perfil === activePerfil);
   const { startDate, endDate } = getCycleDates();
 
-  // Filtrar movimientos del ciclo actual vs anteriores
   const currentCycleTx = profileTx.filter(t => {
     const d = new Date(t.fecha + "T00:00:00");
     return d >= startDate && d <= endDate;
@@ -256,7 +320,6 @@ function renderAll() {
     return d < startDate;
   });
 
-  // Saldo remanente de meses pasados
   let remanenteAnterior = 0;
   previousTx.forEach(t => {
     if (t.tipo === "Ingreso") remanenteAnterior += t.valor;
@@ -278,7 +341,6 @@ function renderBalanceAndDonut(currentCycleTx, remanenteAnterior, startDate, end
     if (tx.tipo === "Gasto") gastosCiclo += tx.valor;
   });
 
-  // Balance total acumulado considerando lo que venía del mes pasado
   const totalBalance = remanenteAnterior + ingresosCiclo - gastosCiclo;
 
   const optionsDate = { month: 'short', day: 'numeric' };
