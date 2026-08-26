@@ -24,21 +24,27 @@
 <body>
 
   <!-- Pantalla de Acceso -->
+<!-- Pantalla de Acceso -->
   <div id="pinScreen" class="pin-overlay">
     <div class="pin-card card-shadow">
       <div class="brand-logo">
         <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
       </div>
-      <h2>Sistema Financiero ELYFER</h2>
-      <p>Selecciona tu perfil e ingresa el PIN de acceso</p>
+      <h2>Sistema Financiero</h2>
+      <p>Selecciona tu perfil o registra uno nuevo</p>
 
+      <!-- Selector de Perfil Existente -->
       <div class="form-group text-left mb-3">
         <label for="pinPerfilSelect">Perfil de Usuario</label>
         <select id="pinPerfilSelect" class="form-control">
-          <option value="Fernando">Fernando</option>
-          <option value="Eli">Eli</option>
-          <option value="Compartido">Compartido</option>
+          <!-- Se llena dinámicamente -->
         </select>
+      </div>
+
+      <!-- Campo para Nuevo Perfil -->
+      <div id="nuevoPerfilGroup" class="form-group text-left mb-3 hidden">
+        <label for="nuevoPerfilInput">Nombre del Nuevo Perfil</label>
+        <input type="text" id="nuevoPerfilInput" placeholder="Ej: Fernando, Eli, Trabajo..." class="form-control">
       </div>
 
       <div class="form-group text-left mb-3">
@@ -47,7 +53,7 @@
       </div>
 
       <button id="btnUnlock" class="btn btn-primary full-width">Ingresar al Sistema</button>
-      <p id="pinError" class="error-msg hidden">PIN incorrecto. Intenta nuevamente.</p>
+      <p id="pinError" class="error-msg hidden">PIN incorrecto o falta el nombre del perfil.</p>
     </div>
   </div>
 
