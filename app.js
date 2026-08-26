@@ -17,7 +17,7 @@ document.addEventListener("DOMContentLoaded", () => {
   initOfflineSync();
 });
 
-/* --- Gestión Dinámica de Perfiles y Autenticación --- */
+/* --- Gestión de Perfiles y Autenticación --- */
 function initPIN() {
   const btnUnlock = document.getElementById("btnUnlock");
   const pinInput = document.getElementById("pinInput");
@@ -27,9 +27,11 @@ function initPIN() {
   const nuevoPerfilInput = document.getElementById("nuevoPerfilInput");
   const btnLogout = document.getElementById("btnLogout");
 
+  // Renderiza el selector de perfiles disponibles + la opción de crear
   const updateProfilesDropdown = () => {
     perfilSelect.innerHTML = "";
-    
+
+    // 1. Insertar perfiles ya creados
     if (profilesList.length > 0) {
       profilesList.forEach(p => {
         const option = document.createElement("option");
@@ -39,21 +41,27 @@ function initPIN() {
       });
     }
 
+    // 2. Opción fija para registrar un perfil nuevo
     const newOption = document.createElement("option");
     newOption.value = "__NEW__";
     newOption.innerText = "+ Registrar Nuevo Perfil";
     perfilSelect.appendChild(newOption);
 
-    if (profilesList.length === 0 || perfilSelect.value === "__NEW__") {
+    // Si no existen perfiles, seleccionar automáticamente "+ Registrar Nuevo Perfil"
+    if (profilesList.length === 0) {
+      perfilSelect.value = "__NEW__";
       nuevoPerfilGroup.classList.remove("hidden");
     } else {
+      // Si hay perfiles, ocultar el input de texto por defecto
       nuevoPerfilGroup.classList.add("hidden");
     }
   };
 
+  // Detectar cambios en la selección del combo box
   perfilSelect.addEventListener("change", (e) => {
     if (e.target.value === "__NEW__") {
       nuevoPerfilGroup.classList.remove("hidden");
+      nuevoPerfilInput.value = "";
       nuevoPerfilInput.focus();
     } else {
       nuevoPerfilGroup.classList.add("hidden");
@@ -63,21 +71,24 @@ function initPIN() {
   updateProfilesDropdown();
 
   const verifyPIN = () => {
-    let perfilSeleccionado = perfilSelect.value;
+    let perfilDestino = "";
 
-    if (perfilSeleccionado === "__NEW__" || profilesList.length === 0) {
-      perfilSeleccionado = nuevoPerfilInput.value.trim();
+    if (perfilSelect.value === "__NEW__") {
+      perfilDestino = nuevoPerfilInput.value.trim();
+    } else {
+      perfilDestino = perfilSelect.value;
     }
 
-    if (!perfilSeleccionado) {
-      pinError.innerText = "Por favor, ingresa o selecciona un perfil.";
+    if (!perfilDestino) {
+      pinError.innerText = "Ingresa o selecciona un nombre de perfil.";
       pinError.classList.remove("hidden");
       return;
     }
 
     if (pinInput.value === PIN_CORRECTO) {
-      activePerfil = perfilSeleccionado;
+      activePerfil = perfilDestino;
 
+      // Si es un perfil nuevo, se añade a la lista local
       if (!profilesList.includes(activePerfil)) {
         profilesList.push(activePerfil);
         localStorage.setItem("app_profiles", JSON.stringify(profilesList));
@@ -86,11 +97,12 @@ function initPIN() {
       document.getElementById("currentPerfilBadge").innerText = `Perfil: ${activePerfil}`;
       document.getElementById("pinScreen").classList.add("hidden");
       document.getElementById("appContent").classList.remove("hidden");
-      
+
+      // Limpiar campos para la próxima sesión
       pinInput.value = "";
       nuevoPerfilInput.value = "";
       pinError.classList.add("hidden");
-      
+
       updateProfilesDropdown();
       renderAll();
     } else {
