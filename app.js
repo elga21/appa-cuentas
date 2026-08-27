@@ -132,28 +132,53 @@ async function fetchCloudTransactions() {
   if (!apiUrl || !navigator.onLine) return;
 
   try {
-    const res = await fetch(apiUrl);
+    const res = await fetch(apiUrl, {
+      method: "GET",
+      redirect: "follow"
+    });
+    
+    if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+    
     const json = await res.json();
+    let cloudData = [];
 
-    if (json.status === "success" && Array.isArray(json.data)) {
-      const cloudData = json.data;
+    if (Array.isArray(json)) {
+      cloudData = json;
+    } else if (json && Array.isArray(json.data)) {
+      cloudData = json.data;
+    } else if (json && Array.isArray(json.transactions)) {
+      cloudData = json.transactions;
+    }
 
-      cloudData.forEach(item => {
-        const p = item.perfil || item.Perfil;
-        if (p && !profilesList.includes(p)) {
-          profilesList.push(p);
+    if (cloudData.length > 0) {
+      const normalizedCloudData = cloudData.map((item, index) => {
+        return {
+          id: item.id || item.ID || `cloud_${index}`,
+          fecha: item.fecha || item.Fecha || item.FECHA || "",
+          perfil: item.perfil || item.Perfil || item.PERFIL || "General",
+          tipo: item.tipo || item.Tipo || item.TIPO || "",
+          subtipo: item.subtipo || item.Subtipo || item.SUBTIPO || "",
+          motivo: item.motivo || item.Motivo || item.MOTIVO || "",
+          valor: parseTxValue(item),
+          synced: true
+        };
+      });
+
+      normalizedCloudData.forEach(item => {
+        if (item.perfil && !profilesList.includes(item.perfil)) {
+          profilesList.push(item.perfil);
         }
       });
       localStorage.setItem("app_profiles", JSON.stringify(profilesList));
 
       const pendingLocalTx = transactions.filter(t => !t.synced);
-      transactions = [...cloudData, ...pendingLocalTx];
+      transactions = [...normalizedCloudData, ...pendingLocalTx];
 
       saveLocalTransactions();
       renderAll();
     }
   } catch (err) {
-    console.error("Error al obtener datos unificados:", err);
+    console.error("Error al obtener datos de Google Sheets:", err);
   }
 }
 
@@ -237,7 +262,7 @@ async function handleFormSubmit(e) {
   };
 
   if (editingTxId) {
-    const idx = transactions.findIndex(t => t.id === editingTxId);
+    const idx = transactions.findIndex(t => (t.id || t.ID) === editingTxId);
     if (idx !== -1) transactions[idx] = txData;
     resetFormState();
   } else {
@@ -261,8 +286,7 @@ function editTransaction(id) {
   document.getElementById("subtipo").value = tx.subtipo || tx.Subtipo;
   document.getElementById("motivo").value = tx.motivo || tx.Motivo || "";
   
-  let val = tx.valor !== undefined ? tx.valor : tx.monto;
-  if (typeof val === "string") val = parseFloat(val.replace(/[^\d.-]/g, "")) || 0;
+  let val = parseTxValue(tx);
   document.getElementById("valor").value = `$ ${val.toLocaleString('es-CO')}`;
 
   const btnGuardar = document.getElementById("btnGuardar");
@@ -354,7 +378,8 @@ function getCycleDates() {
 }
 
 function parseTxValue(tx) {
-  let valRaw = tx.valor !== undefined ? tx.valor : (tx.monto !== undefined ? tx.monto : 0);
+  let valRaw = tx.valor !== undefined ? tx.valor : (tx.monto !== undefined ? tx.monto : (tx.Valor !== undefined ? tx.Valor : tx.Monto));
+  if (valRaw === undefined || valRaw === null) return 0;
   if (typeof valRaw === "string") {
     valRaw = valRaw.replace(/[^\d.-]/g, "");
   }
@@ -494,7 +519,6 @@ function renderMonthlyTrend(allTx) {
 
   const { startDate, endDate } = getCycleDates();
 
-  // Filtrar transacciones pertenecientes al ciclo actual
   const currentCycleTx = allTx.filter(t => {
     const f = t.fecha || t.Fecha;
     if (!f) return false;
@@ -504,7 +528,6 @@ function renderMonthlyTrend(allTx) {
     return d >= startDate && d <= endDate;
   });
 
-  // Mapear por cada día del ciclo
   const dailyMap = {};
   let cur = new Date(startDate);
   
@@ -556,7 +579,7 @@ function renderMonthlyTrend(allTx) {
         {
           label: 'Ingresos Acumulados',
           data: dataIngresos,
-          borderColor: '#059669', // Verde
+          borderColor: '#059669',
           backgroundColor: '#059669',
           borderWidth: 3,
           pointRadius: 3,
@@ -566,7 +589,7 @@ function renderMonthlyTrend(allTx) {
         {
           label: 'Gastos Acumulados',
           data: dataGastos,
-          borderColor: '#dc2626', // Rojo
+          borderColor: '#dc2626',
           backgroundColor: '#dc2626',
           borderWidth: 3,
           pointRadius: 3,
@@ -576,7 +599,7 @@ function renderMonthlyTrend(allTx) {
         {
           label: 'Tendencia Flujo Neto',
           data: dataNeto,
-          borderColor: '#94a3b8', // Gris
+          borderColor: '#94a3b8',
           backgroundColor: '#94a3b8',
           borderWidth: 2,
           borderDash: [5, 5],
