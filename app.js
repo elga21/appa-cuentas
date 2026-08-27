@@ -140,7 +140,6 @@ async function fetchCloudTransactions() {
     if (json.status === "success" && Array.isArray(json.data)) {
       const cloudData = json.data;
 
-      // Descubrir nuevos perfiles registrados en la hoja única
       cloudData.forEach(item => {
         if (item.perfil && !profilesList.includes(item.perfil)) {
           profilesList.push(item.perfil);
@@ -148,7 +147,6 @@ async function fetchCloudTransactions() {
       });
       localStorage.setItem("app_profiles", JSON.stringify(profilesList));
 
-      // Mantener registros locales aún no sincronizados y actualizar los demás
       const pendingLocalTx = transactions.filter(t => !t.synced);
       transactions = [...cloudData, ...pendingLocalTx];
 
@@ -326,7 +324,6 @@ async function syncTransactionWithAction(tx) {
     updateSyncBadge();
     mostrarToast(tx.action === "DELETE" ? "Eliminado en Google Sheets" : "Sincronizado con Sheets");
     
-    // Forzar actualización inmediata para verificar reflejo de cambios
     setTimeout(fetchCloudTransactions, 1000);
   } catch (err) {
     console.error("Error al sincronizar:", err);
@@ -355,23 +352,26 @@ function getCycleDates() {
 }
 
 function renderAll() {
-  // Se integran los movimientos de la tabla unificada para el cálculo consolidado
   const { startDate, endDate } = getCycleDates();
 
   const currentCycleTx = transactions.filter(t => {
-    const d = new Date(t.fecha + "T00:00:00");
+    if (!t.fecha) return false;
+    const parts = t.fecha.split("-");
+    const d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
     return d >= startDate && d <= endDate;
   });
 
   const previousTx = transactions.filter(t => {
-    const d = new Date(t.fecha + "T00:00:00");
+    if (!t.fecha) return false;
+    const parts = t.fecha.split("-");
+    const d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
     return d < startDate;
   });
 
   let remanenteAnterior = 0;
   previousTx.forEach(t => {
-    if (t.tipo === "Ingreso") remanenteAnterior += t.valor;
-    if (t.tipo === "Gasto") remanenteAnterior -= t.valor;
+    if (t.tipo === "Ingreso") remanenteAnterior += Number(t.valor) || 0;
+    if (t.tipo === "Gasto") remanenteAnterior -= Number(t.valor) || 0;
   });
 
   renderBalanceAndDonut(currentCycleTx, remanenteAnterior, startDate, endDate);
@@ -385,8 +385,9 @@ function renderBalanceAndDonut(currentCycleTx, remanenteAnterior, startDate, end
   let gastosCiclo = 0;
 
   currentCycleTx.forEach(tx => {
-    if (tx.tipo === "Ingreso") ingresosCiclo += tx.valor;
-    if (tx.tipo === "Gasto") gastosCiclo += tx.valor;
+    const val = Number(tx.valor) || 0;
+    if (tx.tipo === "Ingreso") ingresosCiclo += val;
+    if (tx.tipo === "Gasto") gastosCiclo += val;
   });
 
   const totalBalance = remanenteAnterior + ingresosCiclo - gastosCiclo;
@@ -398,7 +399,9 @@ function renderBalanceAndDonut(currentCycleTx, remanenteAnterior, startDate, end
   document.getElementById("totalIngresos").innerText = `$ ${ingresosCiclo.toLocaleString('es-CO')}`;
   document.getElementById("totalGastos").innerText = `$ ${gastosCiclo.toLocaleString('es-CO')}`;
 
-  const ctx = document.getElementById("balanceChart").getContext("2d");
+  const canvas = document.getElementById("balanceChart");
+  if (!canvas) return;
+  const ctx = canvas.getContext("2d");
   if (donutChartInstance) donutChartInstance.destroy();
 
   const totalDisponible = Math.max(0, (remanenteAnterior + ingresosCiclo) - gastosCiclo);
@@ -424,6 +427,7 @@ function renderBalanceAndDonut(currentCycleTx, remanenteAnterior, startDate, end
 
 function renderTable(allTx, currentCycleTx) {
   const tbody = document.getElementById("tablaCuerpo");
+  if (!tbody) return;
   tbody.innerHTML = "";
 
   let baseTx = (periodFilter === "actual") ? currentCycleTx : allTx;
@@ -436,13 +440,14 @@ function renderTable(allTx, currentCycleTx) {
     const tr = document.createElement("tr");
     const claseMonto = tx.tipo === "Ingreso" ? "text-ingreso" : "text-gasto";
     const signo = tx.tipo === "Gasto" ? "-" : "+";
+    const val = Number(tx.valor) || 0;
 
     tr.innerHTML = `
       <td>${tx.fecha}</td>
       <td><strong>${tx.perfil || 'General'}</strong></td>
       <td>${tx.subtipo}</td>
       <td>${tx.motivo || '-'}</td>
-      <td class="text-right ${claseMonto}"><strong>${signo} $${tx.valor.toLocaleString('es-CO')}</strong></td>
+      <td class="text-right ${claseMonto}"><strong>${signo} $${val.toLocaleString('es-CO')}</strong></td>
       <td class="text-center">
         <button class="btn-action" onclick="editTransaction('${tx.id}')" title="Editar">✏️</button>
         <button class="btn-action" onclick="deleteTransaction('${tx.id}')" title="Eliminar">🗑️</button>
@@ -454,12 +459,17 @@ function renderTable(allTx, currentCycleTx) {
 
 /* --- Gráfica de Tendencia: Ingresos vs Egresos por Ciclo --- */
 function renderMonthlyTrend(allTx) {
+  const canvas = document.getElementById("monthlyTrendChart");
+  if (!canvas) return;
+
+  const ctx = canvas.getContext("2d");
+  if (monthlyChartInstance) monthlyChartInstance.destroy();
+
   if (!allTx || allTx.length === 0) return;
 
   const startDay = parseInt(localStorage.getItem("app_dia_ciclo") || 1, 10);
   const cycleDataMap = {};
 
-  // Agrupar cada transacción en su ciclo correspondiente según el día de inicio configurado
   allTx.forEach(tx => {
     if (!tx.fecha) return;
     
@@ -469,19 +479,21 @@ function renderMonthlyTrend(allTx) {
     const month = parseInt(parts[1], 10) - 1;
     const day = parseInt(parts[2], 10);
     
-    // Determinar la fecha de inicio del ciclo para esta transacción
-    let cycleStart;
-    if (day >= startDay) {
-      cycleStart = new Date(year, month, startDay);
-    } else {
-      cycleStart = new Date(year, month - 1, startDay);
+    let cycleStartYear = year;
+    let cycleStartMonth = month;
+
+    if (day < startDay) {
+      cycleStartMonth -= 1;
+      if (cycleStartMonth < 0) {
+        cycleStartMonth = 11;
+        cycleStartYear -= 1;
+      }
     }
 
-    // Determinar la fecha fin del ciclo
-    const cycleEnd = new Date(cycleStart.getFullYear(), cycleStart.getMonth() + 1, startDay - 1, 23, 59, 59);
+    const cycleStart = new Date(cycleStartYear, cycleStartMonth, startDay);
+    const cycleEnd = new Date(cycleStartYear, cycleStartMonth + 1, startDay - 1);
 
-    // Clave única del ciclo
-    const cycleKey = cycleStart.toISOString().split("T")[0];
+    const cycleKey = `${cycleStartYear}-${String(cycleStartMonth + 1).padStart(2, '0')}-${String(startDay).padStart(2, '0')}`;
 
     if (!cycleDataMap[cycleKey]) {
       const options = { day: '2-digit', month: 'short' };
@@ -495,22 +507,17 @@ function renderMonthlyTrend(allTx) {
       };
     }
 
-    if (tx.tipo === "Ingreso") cycleDataMap[cycleKey].ingresos += tx.valor;
-    if (tx.tipo === "Gasto") cycleDataMap[cycleKey].gastos += tx.valor;
+    const val = Number(tx.valor) || 0;
+    if (tx.tipo === "Ingreso") cycleDataMap[cycleKey].ingresos += val;
+    if (tx.tipo === "Gasto") cycleDataMap[cycleKey].gastos += val;
   });
 
-  // Ordenar ciclos cronológicamente
   const sortedCycles = Object.values(cycleDataMap).sort((a, b) => a.sortDate - b.sortDate);
-
-  // Seleccionar últimos 8 ciclos para mantener buena visibilidad
   const recentCycles = sortedCycles.slice(-8);
 
   const labels = recentCycles.map(c => c.label);
   const dataIngresos = recentCycles.map(c => c.ingresos);
   const dataGastos = recentCycles.map(c => c.gastos);
-
-  const ctx = document.getElementById("monthlyTrendChart").getContext("2d");
-  if (monthlyChartInstance) monthlyChartInstance.destroy();
 
   monthlyChartInstance = new Chart(ctx, {
     type: 'bar',
@@ -623,6 +630,7 @@ function saveLocalTransactions() {
 
 function updateSyncBadge() {
   const badge = document.getElementById("syncStatus");
+  if (!badge) return;
   const pending = transactions.filter(t => !t.synced).length;
 
   if (!navigator.onLine) {
@@ -645,7 +653,6 @@ function initOfflineSync() {
   });
   window.addEventListener("offline", updateSyncBadge);
 
-  // Re-sincronizar cuando el usuario vuelva a abrir la app en el teléfono
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible") {
       fetchCloudTransactions();
@@ -659,6 +666,7 @@ function initOfflineSync() {
 
 function mostrarToast(msg) {
   const toast = document.getElementById("toast");
+  if (!toast) return;
   toast.innerText = msg;
   toast.classList.remove("hidden");
   setTimeout(() => toast.classList.add("hidden"), 3000);
