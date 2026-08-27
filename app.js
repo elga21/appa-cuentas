@@ -452,45 +452,86 @@ function renderTable(allTx, currentCycleTx) {
   });
 }
 
+/* --- Gráfica de Tendencia: Ingresos vs Egresos por Ciclo --- */
 function renderMonthlyTrend(allTx) {
-  const monthlyData = {};
+  if (!allTx || allTx.length === 0) return;
 
+  const startDay = parseInt(localStorage.getItem("app_dia_ciclo") || 1, 10);
+  const cycleDataMap = {};
+
+  // Agrupar cada transacción en su ciclo correspondiente según el día de inicio configurado
   allTx.forEach(tx => {
-    const monthKey = tx.fecha.substring(0, 7);
-    if (!monthlyData[monthKey]) {
-      monthlyData[monthKey] = { ingresos: 0, gastos: 0 };
+    if (!tx.fecha) return;
+    
+    const parts = tx.fecha.split("-");
+    if (parts.length !== 3) return;
+    const year = parseInt(parts[0], 10);
+    const month = parseInt(parts[1], 10) - 1;
+    const day = parseInt(parts[2], 10);
+    
+    // Determinar la fecha de inicio del ciclo para esta transacción
+    let cycleStart;
+    if (day >= startDay) {
+      cycleStart = new Date(year, month, startDay);
+    } else {
+      cycleStart = new Date(year, month - 1, startDay);
     }
-    if (tx.tipo === "Ingreso") monthlyData[monthKey].ingresos += tx.valor;
-    if (tx.tipo === "Gasto") monthlyData[monthKey].gastos += tx.valor;
+
+    // Determinar la fecha fin del ciclo
+    const cycleEnd = new Date(cycleStart.getFullYear(), cycleStart.getMonth() + 1, startDay - 1, 23, 59, 59);
+
+    // Clave única del ciclo
+    const cycleKey = cycleStart.toISOString().split("T")[0];
+
+    if (!cycleDataMap[cycleKey]) {
+      const options = { day: '2-digit', month: 'short' };
+      const labelStr = `${cycleStart.toLocaleDateString('es-CO', options)} - ${cycleEnd.toLocaleDateString('es-CO', options)}`;
+      
+      cycleDataMap[cycleKey] = {
+        sortDate: cycleStart.getTime(),
+        label: labelStr,
+        ingresos: 0,
+        gastos: 0
+      };
+    }
+
+    if (tx.tipo === "Ingreso") cycleDataMap[cycleKey].ingresos += tx.valor;
+    if (tx.tipo === "Gasto") cycleDataMap[cycleKey].gastos += tx.valor;
   });
 
-  const sortedMonths = Object.keys(monthlyData).sort();
-  const dataIngresos = sortedMonths.map(m => monthlyData[m].ingresos);
-  const dataGastos = sortedMonths.map(m => monthlyData[m].gastos);
+  // Ordenar ciclos cronológicamente
+  const sortedCycles = Object.values(cycleDataMap).sort((a, b) => a.sortDate - b.sortDate);
+
+  // Seleccionar últimos 8 ciclos para mantener buena visibilidad
+  const recentCycles = sortedCycles.slice(-8);
+
+  const labels = recentCycles.map(c => c.label);
+  const dataIngresos = recentCycles.map(c => c.ingresos);
+  const dataGastos = recentCycles.map(c => c.gastos);
 
   const ctx = document.getElementById("monthlyTrendChart").getContext("2d");
   if (monthlyChartInstance) monthlyChartInstance.destroy();
 
   monthlyChartInstance = new Chart(ctx, {
-    type: 'line',
+    type: 'bar',
     data: {
-      labels: sortedMonths,
+      labels: labels,
       datasets: [
         {
           label: 'Ingresos',
           data: dataIngresos,
-          borderColor: '#059669',
-          backgroundColor: 'rgba(5, 150, 105, 0.08)',
-          tension: 0.3,
-          fill: true
+          backgroundColor: '#059669',
+          borderRadius: 4,
+          barPercentage: 0.6,
+          categoryPercentage: 0.6
         },
         {
-          label: 'Gastos',
+          label: 'Egresos (Gastos)',
           data: dataGastos,
-          borderColor: '#dc2626',
-          backgroundColor: 'rgba(220, 38, 38, 0.08)',
-          tension: 0.3,
-          fill: true
+          backgroundColor: '#dc2626',
+          borderRadius: 4,
+          barPercentage: 0.6,
+          categoryPercentage: 0.6
         }
       ]
     },
@@ -498,11 +539,53 @@ function renderMonthlyTrend(allTx) {
       responsive: true,
       maintainAspectRatio: false,
       plugins: {
-        legend: { labels: { color: '#475569', font: { size: 12, weight: '500' } } }
+        legend: {
+          display: true,
+          position: 'top',
+          labels: { color: '#334155', font: { size: 12, weight: '600' } }
+        },
+        tooltip: {
+          callbacks: {
+            label: function(context) {
+              let label = context.dataset.label || '';
+              if (label) label += ': ';
+              if (context.parsed.y !== null) {
+                label += '$ ' + context.parsed.y.toLocaleString('es-CO');
+              }
+              return label;
+            }
+          }
+        }
       },
       scales: {
-        x: { ticks: { color: '#64748b' }, grid: { color: '#e2e8f0' } },
-        y: { ticks: { color: '#64748b' }, grid: { color: '#e2e8f0' } }
+        x: {
+          title: {
+            display: true,
+            text: 'Ciclos de Pago',
+            color: '#475569',
+            font: { weight: 'bold', size: 12 }
+          },
+          ticks: { color: '#64748b', font: { size: 11 } },
+          grid: { display: false }
+        },
+        y: {
+          title: {
+            display: true,
+            text: 'Valor ($)',
+            color: '#475569',
+            font: { weight: 'bold', size: 12 }
+          },
+          ticks: {
+            color: '#64748b',
+            callback: function(value) {
+              if (value >= 1000000) return '$' + (value / 1000000).toFixed(1) + 'M';
+              if (value >= 1000) return '$' + (value / 1000).toFixed(0) + 'k';
+              return '$' + value;
+            }
+          },
+          grid: { color: '#f1f5f9' },
+          beginAtZero: true
+        }
       }
     }
   });
@@ -562,7 +645,7 @@ function initOfflineSync() {
   });
   window.addEventListener("offline", updateSyncBadge);
 
-  // Re-sincronizar cuando el usuario vuelva a abrir la app en el teléfono (al cambiar de app)
+  // Re-sincronizar cuando el usuario vuelva a abrir la app en el teléfono
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "visible") {
       fetchCloudTransactions();
