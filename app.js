@@ -3,10 +3,11 @@ let transactions = JSON.parse(localStorage.getItem("app_transactions")) || [];
 let profilesList = JSON.parse(localStorage.getItem("app_profiles")) || [];
 let activePerfil = "";
 let currentFilter = "Todos";
-let periodFilter = "actual"; // 'actual' o 'todos'
+let periodFilter = "actual";
 let editingTxId = null;
 let donutChartInstance = null;
 let monthlyChartInstance = null;
+let syncInterval = null;
 
 document.addEventListener("DOMContentLoaded", () => {
   initPIN();
@@ -98,8 +99,12 @@ function initPIN() {
       updateProfilesDropdown();
       renderAll();
 
-      // Cargar datos remotos desde Google Sheets
+      // Sincronizar de inmediato
       await fetchCloudTransactions();
+
+      // Iniciar polling automático cada 10 segundos
+      if (syncInterval) clearInterval(syncInterval);
+      syncInterval = setInterval(fetchCloudTransactions, 10000);
     } else {
       pinError.innerText = "PIN incorrecto. Intenta nuevamente.";
       pinError.classList.remove("hidden");
@@ -116,18 +121,17 @@ function initPIN() {
   });
 
   btnLogout.addEventListener("click", () => {
+    if (syncInterval) clearInterval(syncInterval);
     document.getElementById("appContent").classList.add("hidden");
     document.getElementById("pinScreen").classList.remove("hidden");
     updateProfilesDropdown();
   });
 }
 
-/* --- Descarga e Integración de Datos desde la Nube --- */
+/* --- Descarga de Datos Unificados de Google Sheets --- */
 async function fetchCloudTransactions() {
   const apiUrl = localStorage.getItem("app_api_url");
   if (!apiUrl || !navigator.onLine) return;
-
-  mostrarToast("Sincronizando con la nube...");
 
   try {
     const res = await fetch(apiUrl);
@@ -136,7 +140,7 @@ async function fetchCloudTransactions() {
     if (json.status === "success" && Array.isArray(json.data)) {
       const cloudData = json.data;
 
-      // Actualizar perfiles encontrados en Sheets
+      // Descubrir nuevos perfiles registrados en la hoja única
       cloudData.forEach(item => {
         if (item.perfil && !profilesList.includes(item.perfil)) {
           profilesList.push(item.perfil);
@@ -144,16 +148,15 @@ async function fetchCloudTransactions() {
       });
       localStorage.setItem("app_profiles", JSON.stringify(profilesList));
 
-      // Sobrescribir registros sincronizados locales con la versión de la nube
+      // Mantener registros locales aún no sincronizados y actualizar los demás
       const pendingLocalTx = transactions.filter(t => !t.synced);
       transactions = [...cloudData, ...pendingLocalTx];
 
       saveLocalTransactions();
       renderAll();
-      mostrarToast("Datos actualizados ✨");
     }
   } catch (err) {
-    console.error("Error al obtener datos remotos:", err);
+    console.error("Error al obtener datos unificados:", err);
   }
 }
 
@@ -322,13 +325,16 @@ async function syncTransactionWithAction(tx) {
     saveLocalTransactions();
     updateSyncBadge();
     mostrarToast(tx.action === "DELETE" ? "Eliminado en Google Sheets" : "Sincronizado con Sheets");
+    
+    // Forzar actualización inmediata para verificar reflejo de cambios
+    setTimeout(fetchCloudTransactions, 1000);
   } catch (err) {
     console.error("Error al sincronizar:", err);
     mostrarToast("Guardado localmente (Offline)");
   }
 }
 
-/* --- Lógica de Filtro por Período Mensual --- */
+/* --- Cálculo y Renderizado Global --- */
 function getCycleDates() {
   const startDay = parseInt(localStorage.getItem("app_dia_ciclo") || 1, 10);
   const now = new Date();
@@ -349,15 +355,15 @@ function getCycleDates() {
 }
 
 function renderAll() {
-  const profileTx = transactions.filter(t => t.perfil === activePerfil);
+  // Se integran los movimientos de la tabla unificada para el cálculo consolidado
   const { startDate, endDate } = getCycleDates();
 
-  const currentCycleTx = profileTx.filter(t => {
+  const currentCycleTx = transactions.filter(t => {
     const d = new Date(t.fecha + "T00:00:00");
     return d >= startDate && d <= endDate;
   });
 
-  const previousTx = profileTx.filter(t => {
+  const previousTx = transactions.filter(t => {
     const d = new Date(t.fecha + "T00:00:00");
     return d < startDate;
   });
@@ -369,8 +375,8 @@ function renderAll() {
   });
 
   renderBalanceAndDonut(currentCycleTx, remanenteAnterior, startDate, endDate);
-  renderTable(profileTx, currentCycleTx);
-  renderMonthlyTrend(profileTx);
+  renderTable(transactions, currentCycleTx);
+  renderMonthlyTrend(transactions);
   updateSyncBadge();
 }
 
@@ -387,7 +393,7 @@ function renderBalanceAndDonut(currentCycleTx, remanenteAnterior, startDate, end
 
   const optionsDate = { month: 'short', day: 'numeric' };
   document.getElementById("periodoTitle").innerText = `CICLO: ${startDate.toLocaleDateString('es-CO', optionsDate)} - ${endDate.toLocaleDateString('es-CO', optionsDate)}`;
-  document.getElementById("remanenteAnteriorText").innerText = `Saldo disponible acumulado anterior: $ ${remanenteAnterior.toLocaleString('es-CO')}`;
+  document.getElementById("remanenteAnteriorText").innerText = `Saldo acumulado anterior: $ ${remanenteAnterior.toLocaleString('es-CO')}`;
   document.getElementById("totalBalance").innerText = `$ ${totalBalance.toLocaleString('es-CO')}`;
   document.getElementById("totalIngresos").innerText = `$ ${ingresosCiclo.toLocaleString('es-CO')}`;
   document.getElementById("totalGastos").innerText = `$ ${gastosCiclo.toLocaleString('es-CO')}`;
@@ -416,24 +422,24 @@ function renderBalanceAndDonut(currentCycleTx, remanenteAnterior, startDate, end
   });
 }
 
-function renderTable(allProfileTx, currentCycleTx) {
+function renderTable(allTx, currentCycleTx) {
   const tbody = document.getElementById("tablaCuerpo");
   tbody.innerHTML = "";
 
-  let baseTx = (periodFilter === "actual") ? currentCycleTx : allProfileTx;
+  let baseTx = (periodFilter === "actual") ? currentCycleTx : allTx;
 
   if (currentFilter !== "Todos") {
     baseTx = baseTx.filter(t => t.tipo === currentFilter);
   }
 
-  baseTx.slice(0, 20).forEach(tx => {
+  baseTx.slice(0, 25).forEach(tx => {
     const tr = document.createElement("tr");
     const claseMonto = tx.tipo === "Ingreso" ? "text-ingreso" : "text-gasto";
     const signo = tx.tipo === "Gasto" ? "-" : "+";
 
     tr.innerHTML = `
       <td>${tx.fecha}</td>
-      <td><strong>${tx.tipo}</strong></td>
+      <td><strong>${tx.perfil || 'General'}</strong></td>
       <td>${tx.subtipo}</td>
       <td>${tx.motivo || '-'}</td>
       <td class="text-right ${claseMonto}"><strong>${signo} $${tx.valor.toLocaleString('es-CO')}</strong></td>
@@ -446,10 +452,10 @@ function renderTable(allProfileTx, currentCycleTx) {
   });
 }
 
-function renderMonthlyTrend(profileTx) {
+function renderMonthlyTrend(allTx) {
   const monthlyData = {};
 
-  profileTx.forEach(tx => {
+  allTx.forEach(tx => {
     const monthKey = tx.fecha.substring(0, 7);
     if (!monthlyData[monthKey]) {
       monthlyData[monthKey] = { ingresos: 0, gastos: 0 };
@@ -555,6 +561,13 @@ function initOfflineSync() {
     fetchCloudTransactions();
   });
   window.addEventListener("offline", updateSyncBadge);
+
+  // Re-sincronizar cuando el usuario vuelva a abrir la app en el teléfono (al cambiar de app)
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "visible") {
+      fetchCloudTransactions();
+    }
+  });
 
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js').catch(err => console.log('SW Error:', err));
