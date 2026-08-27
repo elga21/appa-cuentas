@@ -457,7 +457,7 @@ function renderTable(allTx, currentCycleTx) {
   });
 }
 
-/* --- Gráfica de Tendencia: Ingresos vs Egresos por Ciclo --- */
+/* --- Gráfica de Tendencia: Ingresos vs Egresos por Ciclo (Blindada) --- */
 function renderMonthlyTrend(allTx) {
   const canvas = document.getElementById("monthlyTrendChart");
   if (!canvas) return;
@@ -465,59 +465,85 @@ function renderMonthlyTrend(allTx) {
   const ctx = canvas.getContext("2d");
   if (monthlyChartInstance) monthlyChartInstance.destroy();
 
-  if (!allTx || allTx.length === 0) return;
-
   const startDay = parseInt(localStorage.getItem("app_dia_ciclo") || 1, 10);
   const cycleDataMap = {};
 
-  allTx.forEach(tx => {
-    if (!tx.fecha) return;
-    
-    const parts = tx.fecha.split("-");
-    if (parts.length !== 3) return;
-    const year = parseInt(parts[0], 10);
-    const month = parseInt(parts[1], 10) - 1;
-    const day = parseInt(parts[2], 10);
-    
-    let cycleStartYear = year;
-    let cycleStartMonth = month;
-
-    if (day < startDay) {
-      cycleStartMonth -= 1;
-      if (cycleStartMonth < 0) {
-        cycleStartMonth = 11;
-        cycleStartYear -= 1;
-      }
-    }
-
-    const cycleStart = new Date(cycleStartYear, cycleStartMonth, startDay);
-    const cycleEnd = new Date(cycleStartYear, cycleStartMonth + 1, startDay - 1);
-
-    const cycleKey = `${cycleStartYear}-${String(cycleStartMonth + 1).padStart(2, '0')}-${String(startDay).padStart(2, '0')}`;
-
-    if (!cycleDataMap[cycleKey]) {
-      const options = { day: '2-digit', month: 'short' };
-      const labelStr = `${cycleStart.toLocaleDateString('es-CO', options)} - ${cycleEnd.toLocaleDateString('es-CO', options)}`;
+  // Procesar y limpiar transacciones
+  if (Array.isArray(allTx) && allTx.length > 0) {
+    allTx.forEach(tx => {
+      // Normalización de campos por si la API envía llaves en mayúsculas o con distinto nombre
+      const fechaRaw = tx.fecha || tx.Fecha || "";
+      const tipoRaw = String(tx.tipo || tx.Tipo || "").trim().toLowerCase();
       
-      cycleDataMap[cycleKey] = {
-        sortDate: cycleStart.getTime(),
-        label: labelStr,
-        ingresos: 0,
-        gastos: 0
-      };
-    }
+      if (!fechaRaw) return;
+      
+      const parts = fechaRaw.split("-");
+      if (parts.length !== 3) return;
+      
+      const year = parseInt(parts[0], 10);
+      const month = parseInt(parts[1], 10) - 1;
+      const day = parseInt(parts[2], 10);
+      
+      if (isNaN(year) || isNaN(month) || isNaN(day)) return;
 
-    const val = Number(tx.valor) || 0;
-    if (tx.tipo === "Ingreso") cycleDataMap[cycleKey].ingresos += val;
-    if (tx.tipo === "Gasto") cycleDataMap[cycleKey].gastos += val;
-  });
+      let cycleStartYear = year;
+      let cycleStartMonth = month;
+
+      if (day < startDay) {
+        cycleStartMonth -= 1;
+        if (cycleStartMonth < 0) {
+          cycleStartMonth = 11;
+          cycleStartYear -= 1;
+        }
+      }
+
+      const cycleStart = new Date(cycleStartYear, cycleStartMonth, startDay);
+      const cycleEnd = new Date(cycleStartYear, cycleStartMonth + 1, startDay - 1);
+
+      const cycleKey = `${cycleStartYear}-${String(cycleStartMonth + 1).padStart(2, '0')}-${String(startDay).padStart(2, '0')}`;
+
+      if (!cycleDataMap[cycleKey]) {
+        const options = { day: '2-digit', month: 'short' };
+        const labelStr = `${cycleStart.toLocaleDateString('es-CO', options)} - ${cycleEnd.toLocaleDateString('es-CO', options)}`;
+        
+        cycleDataMap[cycleKey] = {
+          sortDate: cycleStart.getTime(),
+          label: labelStr,
+          ingresos: 0,
+          gastos: 0
+        };
+      }
+
+      // Limpieza estricta del valor por si viene en formato texto/moneda ($ 1.000.000)
+      let valRaw = tx.valor !== undefined ? tx.valor : (tx.monto !== undefined ? tx.monto : 0);
+      if (typeof valRaw === "string") {
+        valRaw = valRaw.replace(/[^\d.-]/g, ""); // Remueve $, puntos, espacios
+      }
+      const val = parseFloat(valRaw) || 0;
+
+      if (tipoRaw === "ingreso") {
+        cycleDataMap[cycleKey].ingresos += val;
+      } else if (tipoRaw === "gasto" || tipoRaw === "egreso") {
+        cycleDataMap[cycleKey].gastos += val;
+      }
+    });
+  }
 
   const sortedCycles = Object.values(cycleDataMap).sort((a, b) => a.sortDate - b.sortDate);
   const recentCycles = sortedCycles.slice(-8);
 
-  const labels = recentCycles.map(c => c.label);
-  const dataIngresos = recentCycles.map(c => c.ingresos);
-  const dataGastos = recentCycles.map(c => c.gastos);
+  // Si no hay datos mapeados, mostramos etiquetas por defecto del ciclo actual para evitar la escala 0..1
+  let labels = recentCycles.map(c => c.label);
+  let dataIngresos = recentCycles.map(c => c.ingresos);
+  let dataGastos = recentCycles.map(c => c.gastos);
+
+  if (labels.length === 0) {
+    const { startDate, endDate } = getCycleDates();
+    const options = { day: '2-digit', month: 'short' };
+    labels = [`${startDate.toLocaleDateString('es-CO', options)} - ${endDate.toLocaleDateString('es-CO', options)}`];
+    dataIngresos = [0];
+    dataGastos = [0];
+  }
 
   monthlyChartInstance = new Chart(ctx, {
     type: 'bar',
@@ -533,7 +559,7 @@ function renderMonthlyTrend(allTx) {
           categoryPercentage: 0.6
         },
         {
-          label: 'Egresos (Gastos)',
+          label: 'Gastos',
           data: dataGastos,
           backgroundColor: '#dc2626',
           borderRadius: 4,
