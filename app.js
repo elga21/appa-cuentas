@@ -27,11 +27,9 @@ function initPIN() {
   const nuevoPerfilInput = document.getElementById("nuevoPerfilInput");
   const btnLogout = document.getElementById("btnLogout");
 
-  // Renderiza el selector de perfiles disponibles + la opción de crear
   const updateProfilesDropdown = () => {
     perfilSelect.innerHTML = "";
 
-    // 1. Insertar perfiles ya creados
     if (profilesList.length > 0) {
       profilesList.forEach(p => {
         const option = document.createElement("option");
@@ -41,23 +39,19 @@ function initPIN() {
       });
     }
 
-    // 2. Opción fija para registrar un perfil nuevo
     const newOption = document.createElement("option");
     newOption.value = "__NEW__";
     newOption.innerText = "+ Registrar Nuevo Perfil";
     perfilSelect.appendChild(newOption);
 
-    // Si no existen perfiles, seleccionar automáticamente "+ Registrar Nuevo Perfil"
     if (profilesList.length === 0) {
       perfilSelect.value = "__NEW__";
       nuevoPerfilGroup.classList.remove("hidden");
     } else {
-      // Si hay perfiles, ocultar el input de texto por defecto
       nuevoPerfilGroup.classList.add("hidden");
     }
   };
 
-  // Detectar cambios en la selección del combo box
   perfilSelect.addEventListener("change", (e) => {
     if (e.target.value === "__NEW__") {
       nuevoPerfilGroup.classList.remove("hidden");
@@ -70,7 +64,7 @@ function initPIN() {
 
   updateProfilesDropdown();
 
-  const verifyPIN = () => {
+  const verifyPIN = async () => {
     let perfilDestino = "";
 
     if (perfilSelect.value === "__NEW__") {
@@ -88,7 +82,6 @@ function initPIN() {
     if (pinInput.value === PIN_CORRECTO) {
       activePerfil = perfilDestino;
 
-      // Si es un perfil nuevo, se añade a la lista local
       if (!profilesList.includes(activePerfil)) {
         profilesList.push(activePerfil);
         localStorage.setItem("app_profiles", JSON.stringify(profilesList));
@@ -98,13 +91,15 @@ function initPIN() {
       document.getElementById("pinScreen").classList.add("hidden");
       document.getElementById("appContent").classList.remove("hidden");
 
-      // Limpiar campos para la próxima sesión
       pinInput.value = "";
       nuevoPerfilInput.value = "";
       pinError.classList.add("hidden");
 
       updateProfilesDropdown();
       renderAll();
+
+      // Cargar datos remotos desde Google Sheets
+      await fetchCloudTransactions();
     } else {
       pinError.innerText = "PIN incorrecto. Intenta nuevamente.";
       pinError.classList.remove("hidden");
@@ -125,6 +120,41 @@ function initPIN() {
     document.getElementById("pinScreen").classList.remove("hidden");
     updateProfilesDropdown();
   });
+}
+
+/* --- Descarga e Integración de Datos desde la Nube --- */
+async function fetchCloudTransactions() {
+  const apiUrl = localStorage.getItem("app_api_url");
+  if (!apiUrl || !navigator.onLine) return;
+
+  mostrarToast("Sincronizando con la nube...");
+
+  try {
+    const res = await fetch(apiUrl);
+    const json = await res.json();
+
+    if (json.status === "success" && Array.isArray(json.data)) {
+      const cloudData = json.data;
+
+      // Actualizar perfiles encontrados en Sheets
+      cloudData.forEach(item => {
+        if (item.perfil && !profilesList.includes(item.perfil)) {
+          profilesList.push(item.perfil);
+        }
+      });
+      localStorage.setItem("app_profiles", JSON.stringify(profilesList));
+
+      // Sobrescribir registros sincronizados locales con la versión de la nube
+      const pendingLocalTx = transactions.filter(t => !t.synced);
+      transactions = [...cloudData, ...pendingLocalTx];
+
+      saveLocalTransactions();
+      renderAll();
+      mostrarToast("Datos actualizados ✨");
+    }
+  } catch (err) {
+    console.error("Error al obtener datos remotos:", err);
+  }
 }
 
 function initSheetRedirect() {
@@ -494,6 +524,7 @@ function initSettings() {
     modal.classList.add("hidden");
     mostrarToast("Ajustes guardados");
     renderAll();
+    fetchCloudTransactions();
   });
 }
 
@@ -521,6 +552,7 @@ function initOfflineSync() {
   window.addEventListener("online", () => {
     updateSyncBadge();
     transactions.filter(t => !t.synced).forEach(syncTransactionWithAction);
+    fetchCloudTransactions();
   });
   window.addEventListener("offline", updateSyncBadge);
 
