@@ -99,10 +99,8 @@ function initPIN() {
       updateProfilesDropdown();
       renderAll();
 
-      // Sincronizar de inmediato
       await fetchCloudTransactions();
 
-      // Iniciar polling automático cada 10 segundos
       if (syncInterval) clearInterval(syncInterval);
       syncInterval = setInterval(fetchCloudTransactions, 10000);
     } else {
@@ -141,8 +139,9 @@ async function fetchCloudTransactions() {
       const cloudData = json.data;
 
       cloudData.forEach(item => {
-        if (item.perfil && !profilesList.includes(item.perfil)) {
-          profilesList.push(item.perfil);
+        const p = item.perfil || item.Perfil;
+        if (p && !profilesList.includes(p)) {
+          profilesList.push(p);
         }
       });
       localStorage.setItem("app_profiles", JSON.stringify(profilesList));
@@ -253,15 +252,18 @@ async function handleFormSubmit(e) {
 }
 
 function editTransaction(id) {
-  const tx = transactions.find(t => t.id === id);
+  const tx = transactions.find(t => (t.id || t.ID) === id);
   if (!tx) return;
 
   editingTxId = id;
-  document.getElementById("fecha").value = tx.fecha;
-  document.getElementById("tipo").value = tx.tipo;
-  document.getElementById("subtipo").value = tx.subtipo;
-  document.getElementById("motivo").value = tx.motivo;
-  document.getElementById("valor").value = `$ ${tx.valor.toLocaleString('es-CO')}`;
+  document.getElementById("fecha").value = tx.fecha || tx.Fecha;
+  document.getElementById("tipo").value = tx.tipo || tx.Tipo;
+  document.getElementById("subtipo").value = tx.subtipo || tx.Subtipo;
+  document.getElementById("motivo").value = tx.motivo || tx.Motivo || "";
+  
+  let val = tx.valor !== undefined ? tx.valor : tx.monto;
+  if (typeof val === "string") val = parseFloat(val.replace(/[^\d.-]/g, "")) || 0;
+  document.getElementById("valor").value = `$ ${val.toLocaleString('es-CO')}`;
 
   const btnGuardar = document.getElementById("btnGuardar");
   btnGuardar.querySelector("span").innerText = "Actualizar Cambios";
@@ -282,7 +284,7 @@ function editTransaction(id) {
 async function deleteTransaction(id) {
   if (!confirm("¿Estás seguro de que deseas eliminar este registro?")) return;
 
-  const txIndex = transactions.findIndex(t => t.id === id);
+  const txIndex = transactions.findIndex(t => (t.id || t.ID) === id);
   if (txIndex === -1) return;
 
   const txToDelete = transactions[txIndex];
@@ -351,27 +353,41 @@ function getCycleDates() {
   return { startDate, endDate };
 }
 
+function parseTxValue(tx) {
+  let valRaw = tx.valor !== undefined ? tx.valor : (tx.monto !== undefined ? tx.monto : 0);
+  if (typeof valRaw === "string") {
+    valRaw = valRaw.replace(/[^\d.-]/g, "");
+  }
+  return parseFloat(valRaw) || 0;
+}
+
 function renderAll() {
   const { startDate, endDate } = getCycleDates();
 
   const currentCycleTx = transactions.filter(t => {
-    if (!t.fecha) return false;
-    const parts = t.fecha.split("-");
+    const f = t.fecha || t.Fecha;
+    if (!f) return false;
+    const parts = f.split("-");
+    if (parts.length !== 3) return false;
     const d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
     return d >= startDate && d <= endDate;
   });
 
   const previousTx = transactions.filter(t => {
-    if (!t.fecha) return false;
-    const parts = t.fecha.split("-");
+    const f = t.fecha || t.Fecha;
+    if (!f) return false;
+    const parts = f.split("-");
+    if (parts.length !== 3) return false;
     const d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
     return d < startDate;
   });
 
   let remanenteAnterior = 0;
   previousTx.forEach(t => {
-    if (t.tipo === "Ingreso") remanenteAnterior += Number(t.valor) || 0;
-    if (t.tipo === "Gasto") remanenteAnterior -= Number(t.valor) || 0;
+    const tipo = String(t.tipo || t.Tipo || "").trim().toLowerCase();
+    const val = parseTxValue(t);
+    if (tipo === "ingreso") remanenteAnterior += val;
+    if (tipo === "gasto" || tipo === "egreso") remanenteAnterior -= val;
   });
 
   renderBalanceAndDonut(currentCycleTx, remanenteAnterior, startDate, endDate);
@@ -385,9 +401,10 @@ function renderBalanceAndDonut(currentCycleTx, remanenteAnterior, startDate, end
   let gastosCiclo = 0;
 
   currentCycleTx.forEach(tx => {
-    const val = Number(tx.valor) || 0;
-    if (tx.tipo === "Ingreso") ingresosCiclo += val;
-    if (tx.tipo === "Gasto") gastosCiclo += val;
+    const tipo = String(tx.tipo || tx.Tipo || "").trim().toLowerCase();
+    const val = parseTxValue(tx);
+    if (tipo === "ingreso") ingresosCiclo += val;
+    if (tipo === "gasto" || tipo === "egreso") gastosCiclo += val;
   });
 
   const totalBalance = remanenteAnterior + ingresosCiclo - gastosCiclo;
@@ -433,31 +450,41 @@ function renderTable(allTx, currentCycleTx) {
   let baseTx = (periodFilter === "actual") ? currentCycleTx : allTx;
 
   if (currentFilter !== "Todos") {
-    baseTx = baseTx.filter(t => t.tipo === currentFilter);
+    baseTx = baseTx.filter(t => {
+      const tipo = String(t.tipo || t.Tipo || "").trim().toLowerCase();
+      return tipo === currentFilter.toLowerCase();
+    });
   }
 
   baseTx.slice(0, 25).forEach(tx => {
     const tr = document.createElement("tr");
-    const claseMonto = tx.tipo === "Ingreso" ? "text-ingreso" : "text-gasto";
-    const signo = tx.tipo === "Gasto" ? "-" : "+";
-    const val = Number(tx.valor) || 0;
+    const tipo = String(tx.tipo || tx.Tipo || "").trim().toLowerCase();
+    const claseMonto = tipo === "ingreso" ? "text-ingreso" : "text-gasto";
+    const signo = (tipo === "gasto" || tipo === "egreso") ? "-" : "+";
+    const val = parseTxValue(tx);
+
+    const txId = tx.id || tx.ID;
+    const fecha = tx.fecha || tx.Fecha || "-";
+    const perfil = tx.perfil || tx.Perfil || 'General';
+    const subtipo = tx.subtipo || tx.Subtipo || "-";
+    const motivo = tx.motivo || tx.Motivo || "-";
 
     tr.innerHTML = `
-      <td>${tx.fecha}</td>
-      <td><strong>${tx.perfil || 'General'}</strong></td>
-      <td>${tx.subtipo}</td>
-      <td>${tx.motivo || '-'}</td>
+      <td>${fecha}</td>
+      <td><strong>${perfil}</strong></td>
+      <td>${subtipo}</td>
+      <td>${motivo}</td>
       <td class="text-right ${claseMonto}"><strong>${signo} $${val.toLocaleString('es-CO')}</strong></td>
       <td class="text-center">
-        <button class="btn-action" onclick="editTransaction('${tx.id}')" title="Editar">✏️</button>
-        <button class="btn-action" onclick="deleteTransaction('${tx.id}')" title="Eliminar">🗑️</button>
+        <button class="btn-action" onclick="editTransaction('${txId}')" title="Editar">✏️</button>
+        <button class="btn-action" onclick="deleteTransaction('${txId}')" title="Eliminar">🗑️</button>
       </td>
     `;
     tbody.appendChild(tr);
   });
 }
 
-/* --- Gráfica de Tendencia: Ingresos vs Egresos por Ciclo (Líneas) --- */
+/* --- Gráfica de Tendencia: Líneas de Ingresos (Verde), Gastos (Rojo) y Neto (Gris) --- */
 function renderMonthlyTrend(allTx) {
   const canvas = document.getElementById("monthlyTrendChart");
   if (!canvas) return;
@@ -465,82 +492,61 @@ function renderMonthlyTrend(allTx) {
   const ctx = canvas.getContext("2d");
   if (monthlyChartInstance) monthlyChartInstance.destroy();
 
-  const startDay = parseInt(localStorage.getItem("app_dia_ciclo") || 1, 10);
-  const cycleDataMap = {};
+  const { startDate, endDate } = getCycleDates();
 
-  // Procesar y limpiar transacciones
-  if (Array.isArray(allTx) && allTx.length > 0) {
-    allTx.forEach(tx => {
-      const fechaRaw = tx.fecha || tx.Fecha || "";
-      const tipoRaw = String(tx.tipo || tx.Tipo || "").trim().toLowerCase();
-      
-      if (!fechaRaw) return;
-      
-      const parts = fechaRaw.split("-");
-      if (parts.length !== 3) return;
-      
-      const year = parseInt(parts[0], 10);
-      const month = parseInt(parts[1], 10) - 1;
-      const day = parseInt(parts[2], 10);
-      
-      if (isNaN(year) || isNaN(month) || isNaN(day)) return;
+  // Filtrar transacciones pertenecientes al ciclo actual
+  const currentCycleTx = allTx.filter(t => {
+    const f = t.fecha || t.Fecha;
+    if (!f) return false;
+    const parts = f.split("-");
+    if (parts.length !== 3) return false;
+    const d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+    return d >= startDate && d <= endDate;
+  });
 
-      let cycleStartYear = year;
-      let cycleStartMonth = month;
-
-      if (day < startDay) {
-        cycleStartMonth -= 1;
-        if (cycleStartMonth < 0) {
-          cycleStartMonth = 11;
-          cycleStartYear -= 1;
-        }
-      }
-
-      const cycleStart = new Date(cycleStartYear, cycleStartMonth, startDay);
-      const cycleEnd = new Date(cycleStartYear, cycleStartMonth + 1, startDay - 1);
-
-      const cycleKey = `${cycleStartYear}-${String(cycleStartMonth + 1).padStart(2, '0')}-${String(startDay).padStart(2, '0')}`;
-
-      if (!cycleDataMap[cycleKey]) {
-        const options = { day: '2-digit', month: 'short' };
-        const labelStr = `${cycleStart.toLocaleDateString('es-CO', options)} - ${cycleEnd.toLocaleDateString('es-CO', options)}`;
-        
-        cycleDataMap[cycleKey] = {
-          sortDate: cycleStart.getTime(),
-          label: labelStr,
-          ingresos: 0,
-          gastos: 0
-        };
-      }
-
-      let valRaw = tx.valor !== undefined ? tx.valor : (tx.monto !== undefined ? tx.monto : 0);
-      if (typeof valRaw === "string") {
-        valRaw = valRaw.replace(/[^\d.-]/g, "");
-      }
-      const val = parseFloat(valRaw) || 0;
-
-      if (tipoRaw === "ingreso") {
-        cycleDataMap[cycleKey].ingresos += val;
-      } else if (tipoRaw === "gasto" || tipoRaw === "egreso") {
-        cycleDataMap[cycleKey].gastos += val;
-      }
-    });
-  }
-
-  const sortedCycles = Object.values(cycleDataMap).sort((a, b) => a.sortDate - b.sortDate);
-  const recentCycles = sortedCycles.slice(-8);
-
-  let labels = recentCycles.map(c => c.label);
-  let dataIngresos = recentCycles.map(c => c.ingresos);
-  let dataGastos = recentCycles.map(c => c.gastos);
-
-  if (labels.length === 0) {
-    const { startDate, endDate } = getCycleDates();
+  // Mapear por cada día del ciclo
+  const dailyMap = {};
+  let cur = new Date(startDate);
+  
+  while (cur <= endDate) {
+    const isoKey = `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, '0')}-${String(cur.getDate()).padStart(2, '0')}`;
     const options = { day: '2-digit', month: 'short' };
-    labels = [`${startDate.toLocaleDateString('es-CO', options)} - ${endDate.toLocaleDateString('es-CO', options)}`];
-    dataIngresos = [0];
-    dataGastos = [0];
+    dailyMap[isoKey] = {
+      label: cur.toLocaleDateString('es-CO', options),
+      ingresos: 0,
+      gastos: 0
+    };
+    cur.setDate(cur.getDate() + 1);
   }
+
+  currentCycleTx.forEach(tx => {
+    const f = tx.fecha || tx.Fecha;
+    if (dailyMap[f]) {
+      const tipo = String(tx.tipo || tx.Tipo || "").trim().toLowerCase();
+      const val = parseTxValue(tx);
+      if (tipo === "ingreso") dailyMap[f].ingresos += val;
+      if (tipo === "gasto" || tipo === "egreso") dailyMap[f].gastos += val;
+    }
+  });
+
+  const dailyKeys = Object.keys(dailyMap).sort();
+  const labels = dailyKeys.map(k => dailyMap[k].label);
+  
+  let acumIngresos = 0;
+  let acumGastos = 0;
+
+  const dataIngresos = [];
+  const dataGastos = [];
+  const dataNeto = [];
+
+  dailyKeys.forEach(k => {
+    acumIngresos += dailyMap[k].ingresos;
+    acumGastos += dailyMap[k].gastos;
+
+    dataIngresos.push(acumIngresos);
+    dataGastos.push(acumGastos);
+    dataNeto.push(acumIngresos - acumGastos);
+  });
 
   monthlyChartInstance = new Chart(ctx, {
     type: 'line',
@@ -548,27 +554,34 @@ function renderMonthlyTrend(allTx) {
       labels: labels,
       datasets: [
         {
-          label: 'Ingresos',
+          label: 'Ingresos Acumulados',
           data: dataIngresos,
-          borderColor: '#059669',
+          borderColor: '#059669', // Verde
           backgroundColor: '#059669',
           borderWidth: 3,
-          pointRadius: 5,
-          pointHoverRadius: 7,
-          pointBackgroundColor: '#059669',
-          tension: 0.3,
+          pointRadius: 3,
+          tension: 0.2,
           fill: false
         },
         {
-          label: 'Gastos',
+          label: 'Gastos Acumulados',
           data: dataGastos,
-          borderColor: '#dc2626',
+          borderColor: '#dc2626', // Rojo
           backgroundColor: '#dc2626',
           borderWidth: 3,
-          pointRadius: 5,
-          pointHoverRadius: 7,
-          pointBackgroundColor: '#dc2626',
-          tension: 0.3,
+          pointRadius: 3,
+          tension: 0.2,
+          fill: false
+        },
+        {
+          label: 'Tendencia Flujo Neto',
+          data: dataNeto,
+          borderColor: '#94a3b8', // Gris
+          backgroundColor: '#94a3b8',
+          borderWidth: 2,
+          borderDash: [5, 5],
+          pointRadius: 2,
+          tension: 0.2,
           fill: false
         }
       ]
@@ -580,7 +593,7 @@ function renderMonthlyTrend(allTx) {
         legend: {
           display: true,
           position: 'top',
-          labels: { color: '#334155', font: { size: 12, weight: '600' } }
+          labels: { color: '#334155', font: { size: 11, weight: '600' } }
         },
         tooltip: {
           callbacks: {
@@ -599,11 +612,11 @@ function renderMonthlyTrend(allTx) {
         x: {
           title: {
             display: true,
-            text: 'Ciclos de Pago',
+            text: 'Días del Ciclo',
             color: '#475569',
-            font: { weight: 'bold', size: 12 }
+            font: { weight: 'bold', size: 11 }
           },
-          ticks: { color: '#64748b', font: { size: 11 } },
+          ticks: { color: '#64748b', font: { size: 10 }, maxRotation: 45 },
           grid: { display: false }
         },
         y: {
@@ -611,13 +624,13 @@ function renderMonthlyTrend(allTx) {
             display: true,
             text: 'Valor ($)',
             color: '#475569',
-            font: { weight: 'bold', size: 12 }
+            font: { weight: 'bold', size: 11 }
           },
           ticks: {
             color: '#64748b',
             callback: function(value) {
-              if (value >= 1000000) return '$' + (value / 1000000).toFixed(1) + 'M';
-              if (value >= 1000) return '$' + (value / 1000).toFixed(0) + 'k';
+              if (Math.abs(value) >= 1000000) return '$' + (value / 1000000).toFixed(1) + 'M';
+              if (Math.abs(value) >= 1000) return '$' + (value / 1000).toFixed(0) + 'k';
               return '$' + value;
             }
           },
