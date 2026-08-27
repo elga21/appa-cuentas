@@ -457,7 +457,7 @@ function renderTable(allTx, currentCycleTx) {
   });
 }
 
-/* --- Gráfica de Tendencia: Ingresos vs Egresos por Ciclo (Blindada) --- */
+/* --- Gráfica de Tendencia: Ingresos vs Egresos por Ciclo (Líneas) --- */
 function renderMonthlyTrend(allTx) {
   const canvas = document.getElementById("monthlyTrendChart");
   if (!canvas) return;
@@ -471,7 +471,6 @@ function renderMonthlyTrend(allTx) {
   // Procesar y limpiar transacciones
   if (Array.isArray(allTx) && allTx.length > 0) {
     allTx.forEach(tx => {
-      // Normalización de campos por si la API envía llaves en mayúsculas o con distinto nombre
       const fechaRaw = tx.fecha || tx.Fecha || "";
       const tipoRaw = String(tx.tipo || tx.Tipo || "").trim().toLowerCase();
       
@@ -514,10 +513,9 @@ function renderMonthlyTrend(allTx) {
         };
       }
 
-      // Limpieza estricta del valor por si viene en formato texto/moneda ($ 1.000.000)
       let valRaw = tx.valor !== undefined ? tx.valor : (tx.monto !== undefined ? tx.monto : 0);
       if (typeof valRaw === "string") {
-        valRaw = valRaw.replace(/[^\d.-]/g, ""); // Remueve $, puntos, espacios
+        valRaw = valRaw.replace(/[^\d.-]/g, "");
       }
       const val = parseFloat(valRaw) || 0;
 
@@ -532,7 +530,6 @@ function renderMonthlyTrend(allTx) {
   const sortedCycles = Object.values(cycleDataMap).sort((a, b) => a.sortDate - b.sortDate);
   const recentCycles = sortedCycles.slice(-8);
 
-  // Si no hay datos mapeados, mostramos etiquetas por defecto del ciclo actual para evitar la escala 0..1
   let labels = recentCycles.map(c => c.label);
   let dataIngresos = recentCycles.map(c => c.ingresos);
   let dataGastos = recentCycles.map(c => c.gastos);
@@ -546,25 +543,33 @@ function renderMonthlyTrend(allTx) {
   }
 
   monthlyChartInstance = new Chart(ctx, {
-    type: 'bar',
+    type: 'line',
     data: {
       labels: labels,
       datasets: [
         {
           label: 'Ingresos',
           data: dataIngresos,
+          borderColor: '#059669',
           backgroundColor: '#059669',
-          borderRadius: 4,
-          barPercentage: 0.6,
-          categoryPercentage: 0.6
+          borderWidth: 3,
+          pointRadius: 5,
+          pointHoverRadius: 7,
+          pointBackgroundColor: '#059669',
+          tension: 0.3,
+          fill: false
         },
         {
           label: 'Gastos',
           data: dataGastos,
+          borderColor: '#dc2626',
           backgroundColor: '#dc2626',
-          borderRadius: 4,
-          barPercentage: 0.6,
-          categoryPercentage: 0.6
+          borderWidth: 3,
+          pointRadius: 5,
+          pointHoverRadius: 7,
+          pointBackgroundColor: '#dc2626',
+          tension: 0.3,
+          fill: false
         }
       ]
     },
