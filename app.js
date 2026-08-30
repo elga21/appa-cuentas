@@ -137,6 +137,10 @@ function initPIN() {
 /* ==========================================================================
    2. SINCRONIZACIÓN CON GOOGLE SHEETS (NUBE)
    ========================================================================== */
+/* ==========================================================================
+   CORRECCIÓN DE CARGA Y RENDERIZADO DE TABLA Y DATOS
+   ========================================================================== */
+
 async function fetchCloudTransactions() {
   const apiUrl = localStorage.getItem("app_api_url");
   if (!apiUrl || !navigator.onLine) return;
@@ -182,7 +186,12 @@ async function fetchCloudTransactions() {
       localStorage.setItem("app_profiles", JSON.stringify(profilesList));
 
       const pendingLocalTx = transactions.filter(t => !t.synced);
-      transactions = [...normalizedCloudData, ...pendingLocalTx];
+      
+      // Combinar los datos sin duplicar por ID
+      const cloudIds = new Set(normalizedCloudData.map(t => String(t.id)));
+      const filteredPending = pendingLocalTx.filter(t => !cloudIds.has(String(t.id || t.ID)));
+      
+      transactions = [...normalizedCloudData, ...filteredPending];
 
       saveLocalTransactions();
       renderAll();
@@ -190,6 +199,94 @@ async function fetchCloudTransactions() {
   } catch (err) {
     console.error("Error al obtener datos de Google Sheets:", err);
   }
+}
+
+function renderAll() {
+  const { startDate, endDate } = getCycleDates();
+
+  // 1. Filtrar transacciones del ciclo actual
+  const currentCycleTx = transactions.filter(t => {
+    const f = t.fecha || t.Fecha || t.FECHA;
+    if (!f) return false;
+    const parts = String(f).split("T")[0].split("-");
+    if (parts.length !== 3) return false;
+    const d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+    return d >= startDate && d <= endDate;
+  });
+
+  // 2. Transacciones anteriores para el remanente
+  const previousTx = transactions.filter(t => {
+    const f = t.fecha || t.Fecha || t.FECHA;
+    if (!f) return false;
+    const parts = String(f).split("T")[0].split("-");
+    if (parts.length !== 3) return false;
+    const d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+    return d < startDate;
+  });
+
+  let remanenteAnterior = 0;
+  previousTx.forEach(t => {
+    const tipo = String(t.tipo || t.Tipo || t.TIPO || "").trim().toLowerCase();
+    const val = parseTxValue(t);
+    if (tipo === "ingreso") remanenteAnterior += val;
+    if (tipo === "gasto" || tipo === "egreso") remanenteAnterior -= val;
+  });
+
+  renderBalanceAndDonut(currentCycleTx, remanenteAnterior, startDate, endDate);
+  renderTable(transactions, currentCycleTx);
+  renderMonthlyTrend(transactions);
+  updateSyncBadge();
+}
+
+function renderTable(allTx, currentCycleTx) {
+  const tbody = document.getElementById("tablaCuerpo");
+  if (!tbody) return;
+  tbody.innerHTML = "";
+
+  // Seleccionar conjunto base según el filtro de periodo
+  let baseTx = (periodFilter === "actual") ? currentCycleTx : allTx;
+
+  // Filtrar según el tipo (Todos / Ingresos / Gastos)
+  if (currentFilter !== "Todos") {
+    baseTx = baseTx.filter(t => {
+      const tipo = String(t.tipo || t.Tipo || t.TIPO || "").trim().toLowerCase();
+      if (currentFilter.toLowerCase() === "ingreso") return tipo === "ingreso";
+      if (currentFilter.toLowerCase() === "gasto") return tipo === "gasto" || tipo === "egreso";
+      return true;
+    });
+  }
+
+  if (baseTx.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="6" class="text-center" style="padding: 20px; color: #64748b;">No hay registros para mostrar en este periodo.</td></tr>`;
+    return;
+  }
+
+  baseTx.slice(0, 50).forEach(tx => {
+    const tr = document.createElement("tr");
+    const tipo = String(tx.tipo || tx.Tipo || tx.TIPO || "").trim().toLowerCase();
+    const claseMonto = tipo === "ingreso" ? "text-ingreso" : "text-gasto";
+    const signo = (tipo === "gasto" || tipo === "egreso") ? "-" : "+";
+    const val = parseTxValue(tx);
+
+    const txId = tx.id || tx.ID || "";
+    const fecha = String(tx.fecha || tx.Fecha || tx.FECHA || "-").split("T")[0];
+    const perfil = tx.perfil || tx.Perfil || tx.PERFIL || 'General';
+    const subtipo = tx.subtipo || tx.Subtipo || tx.SUBTIPO || "-";
+    const motivo = tx.motivo || tx.Motivo || tx.MOTIVO || "-";
+
+    tr.innerHTML = `
+      <td>${fecha}</td>
+      <td><strong>${perfil}</strong></td>
+      <td>${subtipo}</td>
+      <td>${motivo}</td>
+      <td class="text-right ${claseMonto}"><strong>${signo} $${val.toLocaleString('es-CO')}</strong></td>
+      <td class="text-center">
+        <button class="btn-action" onclick="editTransaction('${txId}')" title="Editar">✏️</button>
+        <button class="btn-action" onclick="deleteTransaction('${txId}')" title="Eliminar">🗑️</button>
+      </td>
+    `;
+    tbody.appendChild(tr);
+  });
 }
 
 async function syncTransactionWithAction(tx) {
