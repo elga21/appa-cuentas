@@ -499,7 +499,7 @@ function renderTable(allTx, currentCycleTx) {
 
   // CAMBIO AQUÍ: Mostramos hasta 1000 registros en lugar de cortar a 25.
   // Si deseas mostrar absolutamente TODOS sin límite, puedes cambiar 1000 por baseTx.length
-  const LIMITE_REGISTROS = Infinity; 
+  const LIMITE_REGISTROS = 20000; 
 
   baseTx.slice(0, LIMITE_REGISTROS).forEach(tx => {
     const tr = document.createElement("tr");
