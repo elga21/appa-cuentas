@@ -481,27 +481,7 @@ function renderTable(allTx, currentCycleTx) {
     });
   }
 
-function renderTable(allTx, currentCycleTx) {
-  const tbody = document.getElementById("tablaCuerpo");
-  if (!tbody) return;
-  tbody.innerHTML = "";
-
-  // Seleccionamos si mostramos solo el ciclo actual o todo el historial
-  let baseTx = (periodFilter === "actual") ? currentCycleTx : allTx;
-
-  // Filtrado por tipo (Ingreso / Gasto)
-  if (currentFilter !== "Todos") {
-    baseTx = baseTx.filter(t => {
-      const tipo = String(t.tipo || t.Tipo || "").trim().toLowerCase();
-      return tipo === currentFilter.toLowerCase();
-    });
-  }
-
-  // CAMBIO AQUÍ: Mostramos hasta 1000 registros en lugar de cortar a 25.
-  // Si deseas mostrar absolutamente TODOS sin límite, puedes cambiar 1000 por baseTx.length
-  const LIMITE_REGISTROS = 20000; 
-
-  baseTx.slice(0, LIMITE_REGISTROS).forEach(tx => {
+  baseTx.slice(0, 30).forEach(tx => {
     const tr = document.createElement("tr");
     const tipo = String(tx.tipo || tx.Tipo || "").trim().toLowerCase();
     const claseMonto = tipo === "ingreso" ? "text-ingreso" : "text-gasto";
