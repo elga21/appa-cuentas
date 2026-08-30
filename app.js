@@ -1,3 +1,8 @@
+/* ==========================================================================
+   SISTEMA DE GESTIÓN FINANCIERA PERSONAL CON NUBE Y SOPORTE OFFLINE
+   ========================================================================== */
+
+// --- CONFIGURACIÓN Y ESTADO GLOBAL ---
 const PIN_CORRECTO = "0308";
 let transactions = JSON.parse(localStorage.getItem("app_transactions")) || [];
 let profilesList = JSON.parse(localStorage.getItem("app_profiles")) || [];
@@ -9,6 +14,7 @@ let donutChartInstance = null;
 let monthlyChartInstance = null;
 let syncInterval = null;
 
+// --- INICIALIZACIÓN DE LA APLICACIÓN ---
 document.addEventListener("DOMContentLoaded", () => {
   initPIN();
   initForm();
@@ -18,7 +24,9 @@ document.addEventListener("DOMContentLoaded", () => {
   initOfflineSync();
 });
 
-/* --- Gestión de Perfiles y Autenticación --- */
+/* ==========================================================================
+   1. GESTIÓN DE PERFILES Y AUTENTICACIÓN (PIN)
+   ========================================================================== */
 function initPIN() {
   const btnUnlock = document.getElementById("btnUnlock");
   const pinInput = document.getElementById("pinInput");
@@ -126,7 +134,9 @@ function initPIN() {
   });
 }
 
-/* --- Descarga de Datos Unificados de Google Sheets --- */
+/* ==========================================================================
+   2. SINCRONIZACIÓN CON GOOGLE SHEETS (NUBE)
+   ========================================================================== */
 async function fetchCloudTransactions() {
   const apiUrl = localStorage.getItem("app_api_url");
   if (!apiUrl || !navigator.onLine) return;
@@ -136,9 +146,9 @@ async function fetchCloudTransactions() {
       method: "GET",
       redirect: "follow"
     });
-    
+
     if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
-    
+
     const json = await res.json();
     let cloudData = [];
 
@@ -182,8 +192,36 @@ async function fetchCloudTransactions() {
   }
 }
 
+async function syncTransactionWithAction(tx) {
+  const apiUrl = localStorage.getItem("app_api_url");
+  if (!apiUrl || !navigator.onLine) {
+    mostrarToast("Guardado en local");
+    return;
+  }
+
+  try {
+    await fetch(apiUrl, {
+      method: "POST",
+      mode: "no-cors",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(tx)
+    });
+
+    tx.synced = true;
+    saveLocalTransactions();
+    updateSyncBadge();
+    mostrarToast(tx.action === "DELETE" ? "Eliminado en Google Sheets" : "Sincronizado con Sheets");
+
+    setTimeout(fetchCloudTransactions, 1000);
+  } catch (err) {
+    console.error("Error al sincronizar:", err);
+    mostrarToast("Guardado localmente (Offline)");
+  }
+}
+
 function initSheetRedirect() {
   const btnOpenSheet = document.getElementById("btnOpenSheet");
+  if (!btnOpenSheet) return;
   btnOpenSheet.addEventListener("click", () => {
     const sheetUrl = localStorage.getItem("app_sheet_url");
     if (sheetUrl) {
@@ -194,52 +232,42 @@ function initSheetRedirect() {
   });
 }
 
-/* --- Filtros de la Tabla --- */
-function initTableFilters() {
-  const filterButtons = document.querySelectorAll(".btn-filter");
-  filterButtons.forEach(btn => {
-    btn.addEventListener("click", (e) => {
-      filterButtons.forEach(b => b.classList.remove("active"));
-      e.target.classList.add("active");
-      currentFilter = e.target.getAttribute("data-filter");
-      renderAll();
-    });
-  });
-
-  const periodSelect = document.getElementById("periodoFilterSelect");
-  periodSelect.addEventListener("change", (e) => {
-    periodFilter = e.target.value;
-    renderAll();
-  });
-}
-
+/* ==========================================================================
+   3. FORMULARIO Y EDICIÓN/ELIMINACIÓN DE REGISTROS
+   ========================================================================== */
 function initForm() {
   const valorInput = document.getElementById("valor");
   const fechaInput = document.getElementById("fecha");
-  
-  fechaInput.value = new Date().toISOString().split('T')[0];
 
-  valorInput.addEventListener("input", (e) => {
-    let rawValue = e.target.value.replace(/\D/g, "");
-    if (!rawValue) {
-      e.target.value = "";
-      return;
-    }
-    let formatted = parseInt(rawValue, 10).toLocaleString("es-CO");
-    e.target.value = `$ ${formatted}`;
-  });
+  if (fechaInput) {
+    fechaInput.value = new Date().toISOString().split('T')[0];
+  }
 
-  document.getElementById("txForm").addEventListener("submit", handleFormSubmit);
+  if (valorInput) {
+    valorInput.addEventListener("input", (e) => {
+      let rawValue = e.target.value.replace(/\D/g, "");
+      if (!rawValue) {
+        e.target.value = "";
+        return;
+      }
+      let formatted = parseInt(rawValue, 10).toLocaleString("es-CO");
+      e.target.value = `$ ${formatted}`;
+    });
+  }
+
+  const txForm = document.getElementById("txForm");
+  if (txForm) {
+    txForm.addEventListener("submit", handleFormSubmit);
+  }
 }
 
-/* --- Guardar / Editar --- */
 async function handleFormSubmit(e) {
   e.preventDefault();
-  
+
   const btnGuardar = document.getElementById("btnGuardar");
   const valorRaw = document.getElementById("valor").value.replace(/\D/g, "");
-  
-  if (!valorRaw || parseInt(valorRaw) <= 0) {
+
+  if (!valorRaw || parseInt(valorRaw, 10) <= 0) {
     mostrarToast("Ingresa un monto válido");
     return;
   }
@@ -285,13 +313,13 @@ function editTransaction(id) {
   document.getElementById("tipo").value = tx.tipo || tx.Tipo;
   document.getElementById("subtipo").value = tx.subtipo || tx.Subtipo;
   document.getElementById("motivo").value = tx.motivo || tx.Motivo || "";
-  
+
   let val = parseTxValue(tx);
   document.getElementById("valor").value = `$ ${val.toLocaleString('es-CO')}`;
 
   const btnGuardar = document.getElementById("btnGuardar");
   btnGuardar.querySelector("span").innerText = "Actualizar Cambios";
-  
+
   if (!document.getElementById("btnCancelEdit")) {
     const btnCancel = document.createElement("button");
     btnCancel.type = "button";
@@ -322,42 +350,22 @@ async function deleteTransaction(id) {
 
 function resetFormState() {
   editingTxId = null;
-  document.getElementById("txForm").reset();
-  document.getElementById("fecha").value = new Date().toISOString().split('T')[0];
+  const txForm = document.getElementById("txForm");
+  if (txForm) txForm.reset();
+
+  const fechaInput = document.getElementById("fecha");
+  if (fechaInput) fechaInput.value = new Date().toISOString().split('T')[0];
+
   const btnGuardar = document.getElementById("btnGuardar");
-  btnGuardar.querySelector("span").innerText = "Guardar Registro";
+  if (btnGuardar) btnGuardar.querySelector("span").innerText = "Guardar Registro";
+
   const btnCancel = document.getElementById("btnCancelEdit");
   if (btnCancel) btnCancel.remove();
 }
 
-async function syncTransactionWithAction(tx) {
-  const apiUrl = localStorage.getItem("app_api_url");
-  if (!apiUrl || !navigator.onLine) {
-    mostrarToast("Guardado en local");
-    return;
-  }
-
-  try {
-    await fetch(apiUrl, {
-      method: "POST",
-      mode: "no-cors",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(tx)
-    });
-
-    tx.synced = true;
-    saveLocalTransactions();
-    updateSyncBadge();
-    mostrarToast(tx.action === "DELETE" ? "Eliminado en Google Sheets" : "Sincronizado con Sheets");
-    
-    setTimeout(fetchCloudTransactions, 1000);
-  } catch (err) {
-    console.error("Error al sincronizar:", err);
-    mostrarToast("Guardado localmente (Offline)");
-  }
-}
-
-/* --- Cálculo y Renderizado Global --- */
+/* ==========================================================================
+   4. CÁLCULOS, CICLOS Y RENDERIZADO GENERAL
+   ========================================================================== */
 function getCycleDates() {
   const startDay = parseInt(localStorage.getItem("app_dia_ciclo") || 1, 10);
   const now = new Date();
@@ -421,6 +429,7 @@ function renderAll() {
   updateSyncBadge();
 }
 
+/* --- Panel de Balance y Gráfica de Dona --- */
 function renderBalanceAndDonut(currentCycleTx, remanenteAnterior, startDate, endDate) {
   let ingresosCiclo = 0;
   let gastosCiclo = 0;
@@ -467,6 +476,27 @@ function renderBalanceAndDonut(currentCycleTx, remanenteAnterior, startDate, end
   });
 }
 
+/* --- Tabla de Transacciones y Filtros --- */
+function initTableFilters() {
+  const filterButtons = document.querySelectorAll(".btn-filter");
+  filterButtons.forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      filterButtons.forEach(b => b.classList.remove("active"));
+      e.target.classList.add("active");
+      currentFilter = e.target.getAttribute("data-filter");
+      renderAll();
+    });
+  });
+
+  const periodSelect = document.getElementById("periodoFilterSelect");
+  if (periodSelect) {
+    periodSelect.addEventListener("change", (e) => {
+      periodFilter = e.target.value;
+      renderAll();
+    });
+  }
+}
+
 function renderTable(allTx, currentCycleTx) {
   const tbody = document.getElementById("tablaCuerpo");
   if (!tbody) return;
@@ -509,7 +539,7 @@ function renderTable(allTx, currentCycleTx) {
   });
 }
 
-/* --- Gráfica de Tendencia: Líneas de Ingresos (Verde), Gastos (Rojo) y Neto (Gris) --- */
+/* --- Gráfica de Tendencia Mensual --- */
 function renderMonthlyTrend(allTx) {
   const canvas = document.getElementById("monthlyTrendChart");
   if (!canvas) return;
@@ -530,7 +560,7 @@ function renderMonthlyTrend(allTx) {
 
   const dailyMap = {};
   let cur = new Date(startDate);
-  
+
   while (cur <= endDate) {
     const isoKey = `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, '0')}-${String(cur.getDate()).padStart(2, '0')}`;
     const options = { day: '2-digit', month: 'short' };
@@ -554,7 +584,7 @@ function renderMonthlyTrend(allTx) {
 
   const dailyKeys = Object.keys(dailyMap).sort();
   const labels = dailyKeys.map(k => dailyMap[k].label);
-  
+
   let acumIngresos = 0;
   let acumGastos = 0;
 
@@ -665,11 +695,16 @@ function renderMonthlyTrend(allTx) {
   });
 }
 
+/* ==========================================================================
+   5. CONFIGURACIÓN Y UTILIDADES
+   ========================================================================== */
 function initSettings() {
   const modal = document.getElementById("settingsModal");
   const btnSettings = document.getElementById("btnSettings");
   const btnClose = document.getElementById("btnCloseSettings");
   const btnSave = document.getElementById("btnSaveSettings");
+
+  if (!btnSettings) return;
 
   btnSettings.addEventListener("click", () => {
     document.getElementById("apiUrl").value = localStorage.getItem("app_api_url") || "";
@@ -678,17 +713,19 @@ function initSettings() {
     modal.classList.remove("hidden");
   });
 
-  btnClose.addEventListener("click", () => modal.classList.add("hidden"));
+  if (btnClose) btnClose.addEventListener("click", () => modal.classList.add("hidden"));
 
-  btnSave.addEventListener("click", () => {
-    localStorage.setItem("app_api_url", document.getElementById("apiUrl").value.trim());
-    localStorage.setItem("app_sheet_url", document.getElementById("sheetUrl").value.trim());
-    localStorage.setItem("app_dia_ciclo", document.getElementById("diaInicioCiclo").value);
-    modal.classList.add("hidden");
-    mostrarToast("Ajustes guardados");
-    renderAll();
-    fetchCloudTransactions();
-  });
+  if (btnSave) {
+    btnSave.addEventListener("click", () => {
+      localStorage.setItem("app_api_url", document.getElementById("apiUrl").value.trim());
+      localStorage.setItem("app_sheet_url", document.getElementById("sheetUrl").value.trim());
+      localStorage.setItem("app_dia_ciclo", document.getElementById("diaInicioCiclo").value);
+      modal.classList.add("hidden");
+      mostrarToast("Ajustes guardados");
+      renderAll();
+      fetchCloudTransactions();
+    });
+  }
 }
 
 function saveLocalTransactions() {
