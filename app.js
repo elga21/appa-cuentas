@@ -37,6 +37,7 @@ function initPIN() {
   const btnLogout = document.getElementById("btnLogout");
 
   const updateProfilesDropdown = () => {
+    if (!perfilSelect) return;
     perfilSelect.innerHTML = "";
 
     if (profilesList.length > 0) {
@@ -55,40 +56,46 @@ function initPIN() {
 
     if (profilesList.length === 0) {
       perfilSelect.value = "__NEW__";
-      nuevoPerfilGroup.classList.remove("hidden");
+      if (nuevoPerfilGroup) nuevoPerfilGroup.classList.remove("hidden");
     } else {
-      nuevoPerfilGroup.classList.add("hidden");
+      if (nuevoPerfilGroup) nuevoPerfilGroup.classList.add("hidden");
     }
   };
 
-  perfilSelect.addEventListener("change", (e) => {
-    if (e.target.value === "__NEW__") {
-      nuevoPerfilGroup.classList.remove("hidden");
-      nuevoPerfilInput.value = "";
-      nuevoPerfilInput.focus();
-    } else {
-      nuevoPerfilGroup.classList.add("hidden");
-    }
-  });
+  if (perfilSelect) {
+    perfilSelect.addEventListener("change", (e) => {
+      if (e.target.value === "__NEW__") {
+        if (nuevoPerfilGroup) nuevoPerfilGroup.classList.remove("hidden");
+        if (nuevoPerfilInput) {
+          nuevoPerfilInput.value = "";
+          nuevoPerfilInput.focus();
+        }
+      } else {
+        if (nuevoPerfilGroup) nuevoPerfilGroup.classList.add("hidden");
+      }
+    });
+  }
 
   updateProfilesDropdown();
 
   const verifyPIN = async () => {
     let perfilDestino = "";
 
-    if (perfilSelect.value === "__NEW__") {
-      perfilDestino = nuevoPerfilInput.value.trim();
-    } else {
+    if (perfilSelect && perfilSelect.value === "__NEW__") {
+      perfilDestino = nuevoPerfilInput ? nuevoPerfilInput.value.trim() : "";
+    } else if (perfilSelect) {
       perfilDestino = perfilSelect.value;
     }
 
     if (!perfilDestino) {
-      pinError.innerText = "Ingresa o selecciona un nombre de perfil.";
-      pinError.classList.remove("hidden");
+      if (pinError) {
+        pinError.innerText = "Ingresa o selecciona un nombre de perfil.";
+        pinError.classList.remove("hidden");
+      }
       return;
     }
 
-    if (pinInput.value === PIN_CORRECTO) {
+    if (pinInput && pinInput.value === PIN_CORRECTO) {
       activePerfil = perfilDestino;
 
       if (!profilesList.includes(activePerfil)) {
@@ -96,13 +103,18 @@ function initPIN() {
         localStorage.setItem("app_profiles", JSON.stringify(profilesList));
       }
 
-      document.getElementById("currentPerfilBadge").innerText = `Perfil: ${activePerfil}`;
-      document.getElementById("pinScreen").classList.add("hidden");
-      document.getElementById("appContent").classList.remove("hidden");
+      const badge = document.getElementById("currentPerfilBadge");
+      if (badge) badge.innerText = `Perfil: ${activePerfil}`;
+
+      const pinScreen = document.getElementById("pinScreen");
+      const appContent = document.getElementById("appContent");
+
+      if (pinScreen) pinScreen.classList.add("hidden");
+      if (appContent) appContent.classList.remove("hidden");
 
       pinInput.value = "";
-      nuevoPerfilInput.value = "";
-      pinError.classList.add("hidden");
+      if (nuevoPerfilInput) nuevoPerfilInput.value = "";
+      if (pinError) pinError.classList.add("hidden");
 
       updateProfilesDropdown();
       renderAll();
@@ -112,35 +124,41 @@ function initPIN() {
       if (syncInterval) clearInterval(syncInterval);
       syncInterval = setInterval(fetchCloudTransactions, 10000);
     } else {
-      pinError.innerText = "PIN incorrecto. Intenta nuevamente.";
-      pinError.classList.remove("hidden");
-      pinInput.value = "";
+      if (pinError) {
+        pinError.innerText = "PIN incorrecto. Intenta nuevamente.";
+        pinError.classList.remove("hidden");
+      }
+      if (pinInput) pinInput.value = "";
     }
   };
 
-  btnUnlock.addEventListener("click", verifyPIN);
-  pinInput.addEventListener("keyup", (e) => {
-    if (e.key === "Enter") verifyPIN();
-  });
-  nuevoPerfilInput.addEventListener("keyup", (e) => {
-    if (e.key === "Enter") verifyPIN();
-  });
+  if (btnUnlock) btnUnlock.addEventListener("click", verifyPIN);
+  if (pinInput) {
+    pinInput.addEventListener("keyup", (e) => {
+      if (e.key === "Enter") verifyPIN();
+    });
+  }
+  if (nuevoPerfilInput) {
+    nuevoPerfilInput.addEventListener("keyup", (e) => {
+      if (e.key === "Enter") verifyPIN();
+    });
+  }
 
-  btnLogout.addEventListener("click", () => {
-    if (syncInterval) clearInterval(syncInterval);
-    document.getElementById("appContent").classList.add("hidden");
-    document.getElementById("pinScreen").classList.remove("hidden");
-    updateProfilesDropdown();
-  });
+  if (btnLogout) {
+    btnLogout.addEventListener("click", () => {
+      if (syncInterval) clearInterval(syncInterval);
+      const appContent = document.getElementById("appContent");
+      const pinScreen = document.getElementById("pinScreen");
+      if (appContent) appContent.classList.add("hidden");
+      if (pinScreen) pinScreen.classList.remove("hidden");
+      updateProfilesDropdown();
+    });
+  }
 }
 
 /* ==========================================================================
    2. SINCRONIZACIÓN CON GOOGLE SHEETS (NUBE)
    ========================================================================== */
-/* ==========================================================================
-   CORRECCIÓN DE CARGA Y RENDERIZADO DE TABLA Y DATOS
-   ========================================================================== */
-
 async function fetchCloudTransactions() {
   const apiUrl = localStorage.getItem("app_api_url");
   if (!apiUrl || !navigator.onLine) return;
@@ -171,8 +189,8 @@ async function fetchCloudTransactions() {
           fecha: item.fecha || item.Fecha || item.FECHA || "",
           perfil: item.perfil || item.Perfil || item.PERFIL || "General",
           tipo: item.tipo || item.Tipo || item.TIPO || "",
-          subtipo: item.subtipo || item.Subtipo || item.SUBTIPO || "",
-          motivo: item.motivo || item.Motivo || item.MOTIVO || "",
+          subtipo: item.subtipo || item.Subtipo || item.SUBTIPO || item.categoria || item.Categoria || "",
+          motivo: item.motivo || item.Motivo || item.MOTIVO || item.descripcion || item.Descripcion || "",
           valor: parseTxValue(item),
           synced: true
         };
@@ -186,11 +204,9 @@ async function fetchCloudTransactions() {
       localStorage.setItem("app_profiles", JSON.stringify(profilesList));
 
       const pendingLocalTx = transactions.filter(t => !t.synced);
-      
-      // Combinar los datos sin duplicar por ID
       const cloudIds = new Set(normalizedCloudData.map(t => String(t.id)));
       const filteredPending = pendingLocalTx.filter(t => !cloudIds.has(String(t.id || t.ID)));
-      
+
       transactions = [...normalizedCloudData, ...filteredPending];
 
       saveLocalTransactions();
@@ -199,94 +215,6 @@ async function fetchCloudTransactions() {
   } catch (err) {
     console.error("Error al obtener datos de Google Sheets:", err);
   }
-}
-
-function renderAll() {
-  const { startDate, endDate } = getCycleDates();
-
-  // 1. Filtrar transacciones del ciclo actual
-  const currentCycleTx = transactions.filter(t => {
-    const f = t.fecha || t.Fecha || t.FECHA;
-    if (!f) return false;
-    const parts = String(f).split("T")[0].split("-");
-    if (parts.length !== 3) return false;
-    const d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
-    return d >= startDate && d <= endDate;
-  });
-
-  // 2. Transacciones anteriores para el remanente
-  const previousTx = transactions.filter(t => {
-    const f = t.fecha || t.Fecha || t.FECHA;
-    if (!f) return false;
-    const parts = String(f).split("T")[0].split("-");
-    if (parts.length !== 3) return false;
-    const d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
-    return d < startDate;
-  });
-
-  let remanenteAnterior = 0;
-  previousTx.forEach(t => {
-    const tipo = String(t.tipo || t.Tipo || t.TIPO || "").trim().toLowerCase();
-    const val = parseTxValue(t);
-    if (tipo === "ingreso") remanenteAnterior += val;
-    if (tipo === "gasto" || tipo === "egreso") remanenteAnterior -= val;
-  });
-
-  renderBalanceAndDonut(currentCycleTx, remanenteAnterior, startDate, endDate);
-  renderTable(transactions, currentCycleTx);
-  renderMonthlyTrend(transactions);
-  updateSyncBadge();
-}
-
-function renderTable(allTx, currentCycleTx) {
-  const tbody = document.getElementById("tablaCuerpo");
-  if (!tbody) return;
-  tbody.innerHTML = "";
-
-  // Seleccionar conjunto base según el filtro de periodo
-  let baseTx = (periodFilter === "actual") ? currentCycleTx : allTx;
-
-  // Filtrar según el tipo (Todos / Ingresos / Gastos)
-  if (currentFilter !== "Todos") {
-    baseTx = baseTx.filter(t => {
-      const tipo = String(t.tipo || t.Tipo || t.TIPO || "").trim().toLowerCase();
-      if (currentFilter.toLowerCase() === "ingreso") return tipo === "ingreso";
-      if (currentFilter.toLowerCase() === "gasto") return tipo === "gasto" || tipo === "egreso";
-      return true;
-    });
-  }
-
-  if (baseTx.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="6" class="text-center" style="padding: 20px; color: #64748b;">No hay registros para mostrar en este periodo.</td></tr>`;
-    return;
-  }
-
-  baseTx.slice(0, 50).forEach(tx => {
-    const tr = document.createElement("tr");
-    const tipo = String(tx.tipo || tx.Tipo || tx.TIPO || "").trim().toLowerCase();
-    const claseMonto = tipo === "ingreso" ? "text-ingreso" : "text-gasto";
-    const signo = (tipo === "gasto" || tipo === "egreso") ? "-" : "+";
-    const val = parseTxValue(tx);
-
-    const txId = tx.id || tx.ID || "";
-    const fecha = String(tx.fecha || tx.Fecha || tx.FECHA || "-").split("T")[0];
-    const perfil = tx.perfil || tx.Perfil || tx.PERFIL || 'General';
-    const subtipo = tx.subtipo || tx.Subtipo || tx.SUBTIPO || "-";
-    const motivo = tx.motivo || tx.Motivo || tx.MOTIVO || "-";
-
-    tr.innerHTML = `
-      <td>${fecha}</td>
-      <td><strong>${perfil}</strong></td>
-      <td>${subtipo}</td>
-      <td>${motivo}</td>
-      <td class="text-right ${claseMonto}"><strong>${signo} $${val.toLocaleString('es-CO')}</strong></td>
-      <td class="text-center">
-        <button class="btn-action" onclick="editTransaction('${txId}')" title="Editar">✏️</button>
-        <button class="btn-action" onclick="deleteTransaction('${txId}')" title="Eliminar">🗑️</button>
-      </td>
-    `;
-    tbody.appendChild(tr);
-  });
 }
 
 async function syncTransactionWithAction(tx) {
@@ -369,7 +297,7 @@ async function handleFormSubmit(e) {
     return;
   }
 
-  btnGuardar.disabled = true;
+  if (btnGuardar) btnGuardar.disabled = true;
 
   const txId = editingTxId || ("tx_" + new Date().getTime());
   const actionType = editingTxId ? "UPDATE" : "CREATE";
@@ -398,7 +326,7 @@ async function handleFormSubmit(e) {
   renderAll();
 
   await syncTransactionWithAction(txData);
-  btnGuardar.disabled = false;
+  if (btnGuardar) btnGuardar.disabled = false;
 }
 
 function editTransaction(id) {
@@ -406,18 +334,19 @@ function editTransaction(id) {
   if (!tx) return;
 
   editingTxId = id;
-  document.getElementById("fecha").value = tx.fecha || tx.Fecha;
-  document.getElementById("tipo").value = tx.tipo || tx.Tipo;
-  document.getElementById("subtipo").value = tx.subtipo || tx.Subtipo;
-  document.getElementById("motivo").value = tx.motivo || tx.Motivo || "";
+  const fechaVal = tx.fecha || tx.Fecha || tx.FECHA || "";
+  document.getElementById("fecha").value = String(fechaVal).split("T")[0];
+  document.getElementById("tipo").value = tx.tipo || tx.Tipo || tx.TIPO || "";
+  document.getElementById("subtipo").value = tx.subtipo || tx.Subtipo || tx.SUBTIPO || tx.categoria || "";
+  document.getElementById("motivo").value = tx.motivo || tx.Motivo || tx.MOTIVO || tx.descripcion || "";
 
   let val = parseTxValue(tx);
   document.getElementById("valor").value = `$ ${val.toLocaleString('es-CO')}`;
 
   const btnGuardar = document.getElementById("btnGuardar");
-  btnGuardar.querySelector("span").innerText = "Actualizar Cambios";
+  if (btnGuardar) btnGuardar.querySelector("span").innerText = "Actualizar Cambios";
 
-  if (!document.getElementById("btnCancelEdit")) {
+  if (!document.getElementById("btnCancelEdit") && btnGuardar) {
     const btnCancel = document.createElement("button");
     btnCancel.type = "button";
     btnCancel.id = "btnCancelEdit";
@@ -495,18 +424,18 @@ function renderAll() {
   const { startDate, endDate } = getCycleDates();
 
   const currentCycleTx = transactions.filter(t => {
-    const f = t.fecha || t.Fecha;
+    const f = t.fecha || t.Fecha || t.FECHA;
     if (!f) return false;
-    const parts = f.split("-");
+    const parts = String(f).split("T")[0].split("-");
     if (parts.length !== 3) return false;
     const d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
     return d >= startDate && d <= endDate;
   });
 
   const previousTx = transactions.filter(t => {
-    const f = t.fecha || t.Fecha;
+    const f = t.fecha || t.Fecha || t.FECHA;
     if (!f) return false;
-    const parts = f.split("-");
+    const parts = String(f).split("T")[0].split("-");
     if (parts.length !== 3) return false;
     const d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
     return d < startDate;
@@ -514,7 +443,7 @@ function renderAll() {
 
   let remanenteAnterior = 0;
   previousTx.forEach(t => {
-    const tipo = String(t.tipo || t.Tipo || "").trim().toLowerCase();
+    const tipo = String(t.tipo || t.Tipo || t.TIPO || "").trim().toLowerCase();
     const val = parseTxValue(t);
     if (tipo === "ingreso") remanenteAnterior += val;
     if (tipo === "gasto" || tipo === "egreso") remanenteAnterior -= val;
@@ -532,7 +461,7 @@ function renderBalanceAndDonut(currentCycleTx, remanenteAnterior, startDate, end
   let gastosCiclo = 0;
 
   currentCycleTx.forEach(tx => {
-    const tipo = String(tx.tipo || tx.Tipo || "").trim().toLowerCase();
+    const tipo = String(tx.tipo || tx.Tipo || tx.TIPO || "").trim().toLowerCase();
     const val = parseTxValue(tx);
     if (tipo === "ingreso") ingresosCiclo += val;
     if (tipo === "gasto" || tipo === "egreso") gastosCiclo += val;
@@ -541,11 +470,17 @@ function renderBalanceAndDonut(currentCycleTx, remanenteAnterior, startDate, end
   const totalBalance = remanenteAnterior + ingresosCiclo - gastosCiclo;
 
   const optionsDate = { month: 'short', day: 'numeric' };
-  document.getElementById("periodoTitle").innerText = `CICLO: ${startDate.toLocaleDateString('es-CO', optionsDate)} - ${endDate.toLocaleDateString('es-CO', optionsDate)}`;
-  document.getElementById("remanenteAnteriorText").innerText = `Saldo acumulado anterior: $ ${remanenteAnterior.toLocaleString('es-CO')}`;
-  document.getElementById("totalBalance").innerText = `$ ${totalBalance.toLocaleString('es-CO')}`;
-  document.getElementById("totalIngresos").innerText = `$ ${ingresosCiclo.toLocaleString('es-CO')}`;
-  document.getElementById("totalGastos").innerText = `$ ${gastosCiclo.toLocaleString('es-CO')}`;
+  const periodoTitle = document.getElementById("periodoTitle");
+  const remanenteText = document.getElementById("remanenteAnteriorText");
+  const totalBalEl = document.getElementById("totalBalance");
+  const totalIngEl = document.getElementById("totalIngresos");
+  const totalGasEl = document.getElementById("totalGastos");
+
+  if (periodoTitle) periodoTitle.innerText = `CICLO: ${startDate.toLocaleDateString('es-CO', optionsDate)} - ${endDate.toLocaleDateString('es-CO', optionsDate)}`;
+  if (remanenteText) remanenteText.innerText = `Saldo acumulado anterior: $ ${remanenteAnterior.toLocaleString('es-CO')}`;
+  if (totalBalEl) totalBalEl.innerText = `$ ${totalBalance.toLocaleString('es-CO')}`;
+  if (totalIngEl) totalIngEl.innerText = `$ ${ingresosCiclo.toLocaleString('es-CO')}`;
+  if (totalGasEl) totalGasEl.innerText = `$ ${gastosCiclo.toLocaleString('es-CO')}`;
 
   const canvas = document.getElementById("balanceChart");
   if (!canvas) return;
@@ -599,27 +534,48 @@ function renderTable(allTx, currentCycleTx) {
   if (!tbody) return;
   tbody.innerHTML = "";
 
+  // Seleccionar conjunto base según el filtro de periodo ("actual" vs "todos")
   let baseTx = (periodFilter === "actual") ? currentCycleTx : allTx;
 
+  // Filtrar por tipo (Todos / Ingresos / Gastos)
   if (currentFilter !== "Todos") {
     baseTx = baseTx.filter(t => {
-      const tipo = String(t.tipo || t.Tipo || "").trim().toLowerCase();
-      return tipo === currentFilter.toLowerCase();
+      const tipo = String(t.tipo || t.Tipo || t.TIPO || "").trim().toLowerCase();
+      if (currentFilter.toLowerCase() === "ingresos" || currentFilter.toLowerCase() === "ingreso") {
+        return tipo === "ingreso";
+      }
+      if (currentFilter.toLowerCase() === "gastos" || currentFilter.toLowerCase() === "gasto") {
+        return tipo === "gasto" || tipo === "egreso";
+      }
+      return true;
     });
   }
 
-  baseTx.slice(0, 30).forEach(tx => {
+  // Ordenar de más reciente a más antiguo por fecha
+  baseTx.sort((a, b) => {
+    const fA = new Date(String(a.fecha || a.Fecha || a.FECHA).split("T")[0]);
+    const fB = new Date(String(b.fecha || b.Fecha || b.FECHA).split("T")[0]);
+    return fB - fA;
+  });
+
+  if (baseTx.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="6" class="text-center" style="padding: 20px; color: #64748b;">No hay registros para mostrar.</td></tr>`;
+    return;
+  }
+
+  // Renderizado completo de TODOS los registros (sin .slice)
+  baseTx.forEach(tx => {
     const tr = document.createElement("tr");
-    const tipo = String(tx.tipo || tx.Tipo || "").trim().toLowerCase();
+    const tipo = String(tx.tipo || tx.Tipo || tx.TIPO || "").trim().toLowerCase();
     const claseMonto = tipo === "ingreso" ? "text-ingreso" : "text-gasto";
     const signo = (tipo === "gasto" || tipo === "egreso") ? "-" : "+";
     const val = parseTxValue(tx);
 
-    const txId = tx.id || tx.ID;
-    const fecha = tx.fecha || tx.Fecha || "-";
-    const perfil = tx.perfil || tx.Perfil || 'General';
-    const subtipo = tx.subtipo || tx.Subtipo || "-";
-    const motivo = tx.motivo || tx.Motivo || "-";
+    const txId = tx.id || tx.ID || "";
+    const fecha = String(tx.fecha || tx.Fecha || tx.FECHA || "-").split("T")[0];
+    const perfil = tx.perfil || tx.Perfil || tx.PERFIL || 'General';
+    const subtipo = tx.subtipo || tx.Subtipo || tx.SUBTIPO || tx.categoria || tx.Categoria || "-";
+    const motivo = tx.motivo || tx.Motivo || tx.MOTIVO || tx.descripcion || tx.Descripcion || "-";
 
     tr.innerHTML = `
       <td>${fecha}</td>
@@ -647,9 +603,9 @@ function renderMonthlyTrend(allTx) {
   const { startDate, endDate } = getCycleDates();
 
   const currentCycleTx = allTx.filter(t => {
-    const f = t.fecha || t.Fecha;
+    const f = t.fecha || t.Fecha || t.FECHA;
     if (!f) return false;
-    const parts = f.split("-");
+    const parts = String(f).split("T")[0].split("-");
     if (parts.length !== 3) return false;
     const d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
     return d >= startDate && d <= endDate;
@@ -670,9 +626,9 @@ function renderMonthlyTrend(allTx) {
   }
 
   currentCycleTx.forEach(tx => {
-    const f = tx.fecha || tx.Fecha;
+    const f = String(tx.fecha || tx.Fecha || tx.FECHA).split("T")[0];
     if (dailyMap[f]) {
-      const tipo = String(tx.tipo || tx.Tipo || "").trim().toLowerCase();
+      const tipo = String(tx.tipo || tx.Tipo || tx.TIPO || "").trim().toLowerCase();
       const val = parseTxValue(tx);
       if (tipo === "ingreso") dailyMap[f].ingresos += val;
       if (tipo === "gasto" || tipo === "egreso") dailyMap[f].gastos += val;
@@ -807,17 +763,17 @@ function initSettings() {
     document.getElementById("apiUrl").value = localStorage.getItem("app_api_url") || "";
     document.getElementById("sheetUrl").value = localStorage.getItem("app_sheet_url") || "";
     document.getElementById("diaInicioCiclo").value = localStorage.getItem("app_dia_ciclo") || 1;
-    modal.classList.remove("hidden");
+    if (modal) modal.classList.remove("hidden");
   });
 
-  if (btnClose) btnClose.addEventListener("click", () => modal.classList.add("hidden"));
+  if (btnClose) btnClose.addEventListener("click", () => modal && modal.classList.add("hidden"));
 
   if (btnSave) {
     btnSave.addEventListener("click", () => {
       localStorage.setItem("app_api_url", document.getElementById("apiUrl").value.trim());
       localStorage.setItem("app_sheet_url", document.getElementById("sheetUrl").value.trim());
       localStorage.setItem("app_dia_ciclo", document.getElementById("diaInicioCiclo").value);
-      modal.classList.add("hidden");
+      if (modal) modal.classList.add("hidden");
       mostrarToast("Ajustes guardados");
       renderAll();
       fetchCloudTransactions();
