@@ -22,6 +22,7 @@ document.addEventListener("DOMContentLoaded", () => {
   initTableFilters();
   initSheetRedirect();
   initOfflineSync();
+  initTasks();
 });
 
 /* ==========================================================================
@@ -119,6 +120,9 @@ function initPIN() {
       updateProfilesDropdown();
       renderAll();
 
+      renderTasks();
+      syncTasks();
+
       await fetchCloudTransactions();
 
       if (syncInterval) clearInterval(syncInterval);
@@ -147,6 +151,8 @@ function initPIN() {
   if (btnLogout) {
     btnLogout.addEventListener("click", () => {
       if (syncInterval) clearInterval(syncInterval);
+      document.getElementById("tasksDialog").close();
+      activePerfil = "";
       const appContent = document.getElementById("appContent");
       const pinScreen = document.getElementById("pinScreen");
       if (appContent) appContent.classList.add("hidden");
@@ -775,6 +781,7 @@ function initSettings() {
       localStorage.setItem("app_dia_ciclo", document.getElementById("diaInicioCiclo").value);
       if (modal) modal.classList.add("hidden");
       mostrarToast("Ajustes guardados");
+      syncTasks();
       renderAll();
       fetchCloudTransactions();
     });
