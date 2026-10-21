@@ -69,6 +69,7 @@
         </div>
         <div class="header-actions">
           <span id="currentPerfilBadge" class="badge-perfil">Perfil: Fernando</span>
+          <button id="btnTasks" class="btn btn-secondary btn-sm" type="button">☑ Tareas</button>
           <button id="btnOpenSheet" class="btn btn-secondary btn-sm" title="Abrir Google Sheet">📊 Sheet</button>
           <button id="btnSettings" class="btn-icon-only" title="Configuración">⚙️</button>
           <button id="btnLogout" class="btn-icon-only" title="Cerrar Sesión">🔒</button>
@@ -246,6 +247,29 @@
 
   <div id="toast" class="toast hidden"></div>
 
+  <dialog id="tasksDialog" class="tasks-dialog card card-shadow" aria-labelledby="tasksTitle">
+    <div class="card-header border-bottom">
+      <h2 id="tasksTitle">Listado de tareas</h2>
+      <button id="btnCloseTasks" type="button" class="btn-close" aria-label="Cerrar tareas">&times;</button>
+    </div>
+    <p id="tasksProfile" class="text-muted-sm"></p>
+    <form id="taskForm" class="task-form">
+      <label for="taskText" class="text-muted-sm">Nueva tarea</label>
+      <div class="task-entry">
+        <input id="taskText" class="form-control" type="text" maxlength="200" required placeholder="Ej: Pagar los servicios" autocomplete="off">
+        <button type="submit" class="btn btn-primary">Agregar</button>
+      </div>
+    </form>
+    <div class="tasks-summary">
+      <span id="tasksCount" aria-live="polite"></span>
+      <button id="btnSyncTasks" type="button" class="btn btn-secondary btn-sm">Sincronizar</button>
+    </div>
+    <p id="tasksSyncStatus" class="text-muted-sm" role="status"></p>
+    <ul id="tasksList" class="tasks-list" aria-label="Tareas del perfil"></ul>
+    <p id="tasksEmpty" class="tasks-empty">No tienes tareas. Agrega la primera.</p>
+  </dialog>
+
+  <script src="tasks.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
