@@ -409,3 +409,23 @@ body {
 }
 
 .toast.hidden { opacity: 0; transform: translateY(20px); pointer-events: none; }
+
+/* Listado de tareas */
+.tasks-dialog { margin: auto; width: min(540px, calc(100% - 2rem)); max-height: 85dvh; overflow-y: auto; color: var(--text-main); }
+.tasks-dialog::backdrop { background: rgba(15, 23, 42, 0.45); }
+.task-entry, .tasks-summary, .task-item { display: flex; align-items: center; gap: 0.75rem; }
+.task-entry input { min-width: 0; flex: 1; }
+.tasks-summary { justify-content: space-between; margin: 1rem 0 0.5rem; font-size: 0.8rem; }
+.tasks-list { list-style: none; }
+.task-item { padding: 0.75rem 0; border-bottom: 1px solid var(--card-border); }
+.task-label { display: flex; flex: 1; align-items: center; gap: 0.75rem; min-width: 0; cursor: pointer; }
+.task-label span { overflow-wrap: anywhere; font-size: 0.9rem; }
+.task-label input { width: 22px; height: 22px; flex-shrink: 0; accent-color: var(--success); }
+.task-completed .task-label span { text-decoration: line-through; color: var(--text-muted); }
+.task-delete { min-width: 44px; min-height: 44px; color: var(--danger); }
+.tasks-empty { padding: 1.5rem 0; text-align: center; color: var(--text-muted); font-size: 0.85rem; }
+@media (max-width: 640px) {
+  .header-container { flex-wrap: wrap; gap: 0.75rem; }
+  .header-actions { flex-wrap: wrap; width: 100%; }
+  .badge-perfil { margin-right: auto; max-width: 100%; overflow-wrap: anywhere; }
+}
