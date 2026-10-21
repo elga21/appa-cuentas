@@ -257,9 +257,27 @@
       <label for="taskText" class="text-muted-sm">Nueva tarea</label>
       <div class="task-entry">
         <input id="taskText" class="form-control" type="text" maxlength="200" required placeholder="Ej: Pagar los servicios" autocomplete="off">
-        <button type="submit" class="btn btn-primary">Agregar</button>
+      </div>
+      <div class="task-fields">
+        <div class="form-group">
+          <label for="taskType">Movimiento</label>
+          <select id="taskType" class="form-control" required><option value="Gasto">Gasto</option><option value="Ingreso">Ingreso</option></select>
+        </div>
+        <div class="form-group">
+          <label for="taskAmount">Valor del pago ($)</label>
+          <input id="taskAmount" type="text" inputmode="numeric" class="form-control" placeholder="$ 0" required>
+        </div>
+        <div class="form-group">
+          <label for="taskDate">Fecha del movimiento</label>
+          <input id="taskDate" type="date" class="form-control" required>
+        </div>
+      </div>
+      <div class="task-form-actions">
+        <button id="btnSaveTask" type="submit" class="btn btn-primary">Agregar tarea</button>
+        <button id="btnCancelTaskEdit" type="button" class="btn btn-secondary hidden">Cancelar edición</button>
       </div>
     </form>
+    <p class="task-help">Al marcar una tarea se registra su gasto o ingreso en Sheets. Al desmarcarla se retira ese movimiento automático. Eliminar una tarea pagada conserva el movimiento.</p>
     <div class="tasks-summary">
       <span id="tasksCount" aria-live="polite"></span>
       <button id="btnSyncTasks" type="button" class="btn btn-secondary btn-sm">Sincronizar</button>
