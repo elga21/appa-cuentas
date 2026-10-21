@@ -172,13 +172,14 @@ async function fetchCloudTransactions() {
   try {
     const res = await fetch(apiUrl, {
       method: "GET",
-      redirect: "follow"
+      redirect: "follow",
+      cache: "no-store"
     });
 
     if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
 
     const json = await res.json();
-    let cloudData = [];
+    let cloudData = null;
 
     if (Array.isArray(json)) {
       cloudData = json;
@@ -188,11 +189,11 @@ async function fetchCloudTransactions() {
       cloudData = json.transactions;
     }
 
-    if (cloudData.length > 0) {
+    if (cloudData !== null) {
       const normalizedCloudData = cloudData.map((item, index) => {
         return {
           id: item.id || item.ID || `cloud_${index}`,
-          fecha: item.fecha || item.Fecha || item.FECHA || "",
+          fecha: item.fecha || item.Fecha || item.FECHA || item.fechaTransaccion || "",
           perfil: item.perfil || item.Perfil || item.PERFIL || "General",
           tipo: item.tipo || item.Tipo || item.TIPO || "",
           subtipo: item.subtipo || item.Subtipo || item.SUBTIPO || item.categoria || item.Categoria || "",
