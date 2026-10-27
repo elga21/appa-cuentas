@@ -205,6 +205,7 @@
         </div>
 
         <!-- Filtros Rápidos -->
+        <p id="cloudConnectionError" class="error-msg hidden" role="alert"></p>
         <div class="filter-bar border-bottom">
           <div class="filter-group">
             <span class="filter-label">Período:</span>
@@ -254,14 +255,18 @@
     </div>
     <p id="tasksProfile" class="text-muted-sm"></p>
     <form id="taskForm" class="task-form">
-      <label for="taskText" class="text-muted-sm">Nueva tarea</label>
+      <label for="taskText" class="text-muted-sm">Descripción / Observación</label>
       <div class="task-entry">
-        <input id="taskText" class="form-control" type="text" maxlength="200" required placeholder="Ej: Pagar los servicios" autocomplete="off">
+        <input id="taskText" class="form-control" type="text" maxlength="200" placeholder="Detalle opcional, ej: Pagar los servicios" autocomplete="off">
       </div>
       <div class="task-fields">
         <div class="form-group">
           <label for="taskType">Movimiento</label>
           <select id="taskType" class="form-control" required><option value="Gasto">Gasto</option><option value="Ingreso">Ingreso</option></select>
+        </div>
+        <div class="form-group">
+          <label for="taskCategory">Categoría</label>
+          <select id="taskCategory" class="form-control" required></select>
         </div>
         <div class="form-group">
           <label for="taskAmount">Valor del pago ($)</label>
@@ -277,12 +282,13 @@
         <button id="btnCancelTaskEdit" type="button" class="btn btn-secondary hidden">Cancelar edición</button>
       </div>
     </form>
-    <p class="task-help">Al marcar una tarea se registra su gasto o ingreso en Sheets. Al desmarcarla se retira ese movimiento automático. Eliminar una tarea pagada conserva el movimiento.</p>
+    <p class="task-help">Cada marcado crea un nuevo gasto o ingreso. Desmarcar, editar o eliminar la tarea conserva los registros anteriores. Al empezar otro ciclo, la tarea permanece y su casilla vuelve a quedar desmarcada; la fecha avanza al nuevo ciclo.</p>
     <div class="tasks-summary">
       <span id="tasksCount" aria-live="polite"></span>
       <button id="btnSyncTasks" type="button" class="btn btn-secondary btn-sm">Sincronizar</button>
     </div>
     <p id="tasksSyncStatus" class="text-muted-sm" role="status"></p>
+    <p id="tasksVersion" class="text-muted-sm"></p>
     <ul id="tasksList" class="tasks-list" aria-label="Tareas del perfil"></ul>
     <p id="tasksEmpty" class="tasks-empty">No tienes tareas. Agrega la primera.</p>
   </dialog>
