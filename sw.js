@@ -1,4 +1,4 @@
-const CACHE_NAME = 'finanzas-app-v3-tareas-pagos';
+const CACHE_NAME = 'finanzas-app-v7-recuperacion-sheets-20261026';
 const CHART_URL = 'https://cdn.jsdelivr.net/npm/chart.js';
 const ASSETS = [
     './',
