@@ -1,0 +1,266 @@
+:root {
+    --bg-color: #0f172a;
+    --card-bg: #1e293b;
+    --card-border: #334155;
+    --text-main: #f8fafc;
+    --text-muted: #94a3b8;
+    --primary: #3b82f6;
+    --primary-hover: #2563eb;
+    --success: #10b981;
+    --danger: #ef4444;
+    --warning: #f59e0b;
+    --input-bg: #0f172a;
+    --radius: 12px;
+    --transition: all 0.25s ease-in-out;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+body {
+    background-color: var(--bg-color);
+    color: var(--text-main);
+    min-height: 100vh;
+    padding-bottom: 2rem;
+}
+
+/* Header */
+.app-header {
+    background-color: var(--card-bg);
+    border-bottom: 1px solid var(--card-border);
+    padding: 1rem 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.header-container {
+    max-width: 1100px;
+    margin: 0 auto;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.brand {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.brand-icon {
+    background: var(--primary);
+    color: white;
+    padding: 0.5rem;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+}
+
+.brand h1 {
+    font-size: 1.25rem;
+    font-weight: 600;
+}
+
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.profile-label {
+    font-size: 0.875rem;
+    color: var(--text-muted);
+}
+
+/* App Layout */
+.main-container {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 0 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+/* Componente Card */
+.card {
+    background-color: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: var(--radius);
+    padding: 1.5rem;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+}
+
+.card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.25rem;
+}
+
+.card-header.border-bottom {
+    border-bottom: 1px solid var(--card-border);
+    padding-bottom: 1rem;
+}
+
+.card-header h2 {
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+
+/* Formulario */
+.form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+}
+
+.full-width {
+    grid-column: 1 / -1;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+}
+
+.form-group label {
+    font-size: 0.825rem;
+    font-weight: 500;
+    color: var(--text-muted);
+}
+
+.form-control,
+.select-input {
+    background-color: var(--input-bg);
+    border: 1px solid var(--card-border);
+    color: var(--text-main);
+    padding: 0.65rem 0.85rem;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    outline: none;
+    transition: var(--transition);
+}
+
+.form-control:focus,
+.select-input:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+}
+
+.form-actions {
+    margin-top: 1.25rem;
+    display: flex;
+    justify-content: flex-end;
+}
+
+/* Botones */
+.btn {
+    padding: 0.65rem 1.25rem;
+    border-radius: 6px;
+    border: none;
+    font-weight: 500;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.btn-primary {
+    background-color: var(--primary);
+    color: white;
+}
+
+.btn-primary:hover {
+    background-color: var(--primary-hover);
+}
+
+.btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* Badges */
+.badge {
+    font-size: 0.75rem;
+    padding: 0.25rem 0.6rem;
+    border-radius: 20px;
+    font-weight: 500;
+}
+
+.badge-success {
+    background-color: rgba(16, 185, 129, 0.15);
+    color: var(--success);
+}
+
+/* Tabla */
+.table-responsive {
+    overflow-x: auto;
+}
+
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    text-align: left;
+    font-size: 0.9rem;
+}
+
+.data-table th {
+    color: var(--text-muted);
+    font-weight: 500;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--card-border);
+}
+
+.data-table td {
+    padding: 0.85rem 1rem;
+    border-bottom: 1px solid var(--card-border);
+}
+
+.data-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.text-right {
+    text-align: right;
+}
+
+.text-ingreso {
+    color: var(--success);
+    font-weight: 600;
+}
+
+.text-gasto {
+    color: var(--danger);
+    font-weight: 600;
+}
+
+.text-ahorro {
+    color: var(--warning);
+    font-weight: 600;
+}
+
+/* Toast Notification */
+.toast {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background-color: var(--card-bg);
+    border: 1px solid var(--card-border);
+    color: var(--text-main);
+    padding: 0.85rem 1.25rem;
+    border-radius: 8px;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.4);
+    font-size: 0.875rem;
+    transition: var(--transition);
+    z-index: 100;
+}
+
+.toast.hidden {
+    opacity: 0;
+    transform: translateY(20px);
+    pointer-events: none;
+}
