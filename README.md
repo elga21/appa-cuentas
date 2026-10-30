@@ -1,4 +1,4 @@
-# Appa Cuentas - App Contable PWA (iOS)
+# Appa Cuentas - App Contable PWA (iOS and android)
 
 Aplicación de contabilidad personal de tipo **PWA (Progressive Web App)**, diseñada con un estilo visual premium (Obsidiana y Oro) y optimizada especialmente para iPhone. Se sincroniza en tiempo real con una hoja de cálculo de Google.
 
